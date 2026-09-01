@@ -9,10 +9,6 @@ from app.services.card_guide_service import CardDetail
 from app.widgets.common import Widget, WidgetResponse, open_url_action, response
 
 
-def clarification_needed(message: str) -> WidgetResponse:
-    return response(None, message)
-
-
 def card_name_clarification() -> WidgetResponse:
     message = "조회할 신한카드 상품명을 정확히 말씀해 주세요."
     widget = {"type": "Card", "children": [{"type": "Text", "value": message}]}
