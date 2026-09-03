@@ -22,9 +22,15 @@ enums in `tools/finance_tips/contents.py`).
 selector dropped. Domain enums (Industry, AnnualFeeBand, CardSortOrder,
 credit_card_name) moved to `domain/`.
 
-**MCI-only, no mock.** A mock backend (`mci/mock.py` + `mci/mock_data.json`) was
-built first for local testing, verified, then removed on the user's instruction
-("이제 mci로만"). `mci/mci_client.py` must stay verbatim as the user pasted it
+**Branches:** `feature/mci-fetch-tools` = real MCI only. `feature/mock` (branched
+off it, for KakaoTools testing) re-adds `mci/mock.py` + `mci/mock_data.json` +
+`mci/mock_client.py` (`MockMciClient`, a drop-in for `MciClient`) and switches the
+3 card tools' import to it — the only diff between the branches. `mci_client.py`
+is unchanged on both.
+
+**`feature/mci-fetch-tools` is MCI-only, no mock.** A mock backend was built
+first, verified, then removed there on the user's instruction ("이제 mci로만").
+`mci/mci_client.py` must stay verbatim as the user pasted it
 (includes `include_sensitive: boolean` and `except e:` — untouched on purpose).
 `MciClient()` reads `$SVC_CONFIG_DIR/mci_interfaces.yaml` at construction and the
 server will not start without it. `mci_interfaces.yaml.example` is the template

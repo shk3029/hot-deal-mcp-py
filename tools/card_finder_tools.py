@@ -7,7 +7,7 @@ from mcp.types import ToolAnnotations
 from domain.industry import Industry
 from kakao.card_finder import credit_card_guide_list, industry_selector
 from kakao.common import annual_fee_range_label
-from mci.mci_client import MciClient
+from mci.mock_client import MockMciClient as MciClient  # feature/mock: 목업 데이터
 from schemas.card_finder_tools_schemas import Card, CardsResult
 from tools.common import with_kakao
 

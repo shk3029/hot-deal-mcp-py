@@ -5,7 +5,7 @@ import traceback
 from mcp.types import ToolAnnotations
 
 from kakao.popular_card import popular_credit_card_list
-from mci.mci_client import MciClient
+from mci.mock_client import MockMciClient as MciClient  # feature/mock: 목업 데이터
 from schemas.card_finder_tools_schemas import CardDetail, CardDetailResult
 from tools.common import with_kakao
 
