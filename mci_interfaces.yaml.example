@@ -1,0 +1,33 @@
+# MciClient(load_client_settings) 가 읽는 인터페이스 설정 템플릿.
+#
+# 실제 파일은 사내 배포물이며 이 레포에 포함되지 않는다.
+#   - 위치: $SVC_CONFIG_DIR/mci_interfaces.yaml
+#           (SVC_CONFIG_DIR 미설정 시 기본값 /project/work/flow/config/dev)
+#   - 이 예시를 복사해 값을 채운 뒤 그 경로에 두면 된다.
+#
+#   cp mci_interfaces.yaml.example /path/to/config/mci_interfaces.yaml
+#   SVC_CONFIG_DIR=/path/to/config ./run.sh
+
+# target(=interfaces[*].target) 키로 조회되는 MCI 게이트웨이 base URL.
+base_dev_url:
+  internal: "http://<dev-mci-host>:<port>"
+base_test_url:
+  internal: "http://<test-mci-host>:<port>"
+base_prd_url:
+  internal: "http://<prd-mci-host>:<port>"
+
+# 툴이 호출하는 ITF ID. 카드 4종 툴은 모두 EGN00001(검색 인터페이스)만 쓴다.
+interfaces:
+  EGN00001:
+    path: "/<mci-service-path>"   # _build_url 에서 base_*_url[target] 뒤에 붙는 경로
+    rp_sv_cd: "<응답서비스코드>"    # RP_SV_CD / DATA_TS_CD 헤더로 들어감
+    target: "internal"             # base_*_url 의 키
+    env: "D"                       # D=개발, T=테스트, R=운영 (EVN_IF_CCD)
+    eai_id: "<EAI 인터페이스 ID>"   # EAI_ITF_ID 헤더
+
+# (선택) 응답 마스킹 규칙. include_sensitive=False 로 호출할 때만 적용된다.
+# 현재 툴들은 include_sensitive=True 로 호출하므로 비워둬도 된다.
+masking_presets: []
+#   - field: "CRD_PD_NM"
+#     pattern: "(\\d{4})\\d{4}(\\d{4})"
+#     repl: "\\1****\\2"

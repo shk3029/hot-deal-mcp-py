@@ -18,4 +18,4 @@ echo "🔌 MCP URL:      http://localhost:${PORT}/mcp"
 echo "❤️  Health Check: http://localhost:${PORT}/health"
 echo ""
 
-exec uv run uvicorn app.main:app --host "$HOST" --port "$PORT"
+exec uv run uvicorn main:app --host "$HOST" --port "$PORT"
