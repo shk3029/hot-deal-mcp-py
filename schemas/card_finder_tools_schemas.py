@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Card(BaseModel):
@@ -28,7 +28,7 @@ class CardDetail(Card):
 
 
 class CardsResult(BaseModel):
-    cards:      list[Card] = []
+    cards:      list[Card] = Field(default_factory=list)
     totalCount: int = 0
     error:      str | None = None
     # 카카오툴즈 응답. 툴 결과 최상위에 그대로 실려 카카오 쪽에서 바로 렌더된다.
@@ -37,8 +37,15 @@ class CardsResult(BaseModel):
 
 
 class CardDetailResult(BaseModel):
-    cards:      list[CardDetail] = []
+    cards:      list[CardDetail] = Field(default_factory=list)
     totalCount: int = 0
     error:      str | None = None
     widget:     dict[str, Any] | None = None
     copy_text:  str = ""
+
+
+class PlayMcpWidgetResponse(BaseModel):
+    """카카오 툴즈가 인식하는 최상위 위젯 응답."""
+
+    widget: dict[str, Any] | None
+    copy_text: str

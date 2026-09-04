@@ -18,6 +18,7 @@ dev = [
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+testpaths = ["python_tests"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["mci", "schemas", "domain", "kakao", "tools"]

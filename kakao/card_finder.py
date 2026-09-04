@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import random
 
+from domain.annual_fee_band import AnnualFeeBand
 from domain.industry import Industry
 from kakao.common import (
     CARD_SEARCH_URL,
@@ -23,6 +24,15 @@ from kakao.common import (
 )
 from schemas.card_finder_tools_schemas import Card
 
+_EMPTY_RESULT_MESSAGE = (
+    "원하는 카드를 찾지 못하셨나요? '더 많은 카드 보기'를 눌러 "
+    "신한카드에서 직접 찾아보세요"
+)
+_EMPTY_RESULT_WIDGET_MESSAGE = (
+    "원하는 카드를 찾지 못하셨나요?\n"
+    "'더 많은 카드 보기'를 눌러 신한카드에서 직접 찾아보세요"
+)
+
 
 def industry_selector() -> WidgetResponse:
     children: list[Widget] = [
@@ -33,12 +43,29 @@ def industry_selector() -> WidgetResponse:
     return response(widget, "원하시는 업종을 선택해 주세요.")
 
 
+def annual_fee_selector() -> WidgetResponse:
+    children: list[Widget] = [
+        {"type": "Text", "value": "원하시는 연회비 구간을 선택해주세요"}
+    ]
+    children.extend(selector_button_rows(AnnualFeeBand.display_names()))
+    widget = {"type": "Card", "children": children}
+    return response(widget, "원하시는 연회비 구간을 선택해 주세요.")
+
+
 def credit_card_guide_list(
     cards: list[Card],
     industry: Industry,
     annual_fee_label: str,
 ) -> WidgetResponse:
     card_rows = [_to_credit_card_list_row(industry, card) for card in cards]
+    if not card_rows:
+        card_rows.append(
+            {
+                "type": "Text",
+                "value": _EMPTY_RESULT_WIDGET_MESSAGE,
+                "textAlign": "center",
+            }
+        )
 
     more_cards_button = {
         "type": "Button",
@@ -65,6 +92,8 @@ def credit_card_guide_list(
     ]
     for card in cards:
         lines.append(f"- {card.CRD_PD_NM} (`{format_won(card.CRD_PD_AFE)}`)")
+    if not cards:
+        lines.append(_EMPTY_RESULT_MESSAGE)
     copy_text = "\n".join(lines) + "\n"
     copy_text += (
         f"\n[더 많은 카드 보기]({CARD_SEARCH_URL})"

@@ -49,15 +49,15 @@ tools = rpc("tools/list", rid=2)["result"]["tools"]
 print(f"tools/list OK  -> {[t['name'] for t in tools]}")
 
 cases = [
-    ("fetch_card_finder", {}),
-    ("fetch_card_finder", {"benefitDetail": "쇼핑", "annualFeeMax": 30000}),
-    ("fetch_card_finder", {"benefitDetail": "청소년"}),
-    ("fetch_card_finder", {"benefitDetail": "대중교통", "sort": "fee"}),
-    ("fetch_card_search", {"keyword": "신한카드 Mr.Life"}),
-    ("fetch_card_search", {"keyword": "없는카드"}),
-    ("fetch_popular_card", {}),
-    ("fetch_finance_tips", {"category": "card_tips"}),
-    ("fetch_finance_tips", {"category": "trend"}),
+    ("getCreditCardRecommendationsWithSelector", {}),
+    ("getCreditCardRecommendationsWithSelector", {"industry": 5, "annualFee": "2~3만원대"}),
+    ("getCreditCardRecommendationsWithSelector", {"industry": 24}),
+    ("getCreditCardRecommendationsWithSelector", {"industry": 9, "sort": "연회비순"}),
+    ("getCreditCardDetail", {"cardName": "신한카드 Mr.Life"}),
+    ("getCreditCardDetail", {"cardName": "없는카드"}),
+    ("getPopularCreditCards", {}),
+    ("getFinancialLifeKnowledgeArticles", {"category": "카드연구소"}),
+    ("getFinancialLifeKnowledgeArticles", {"category": "트렌드"}),
 ]
 
 for name, args in cases:
@@ -68,11 +68,10 @@ for name, args in cases:
         print("  ERROR:", r["__error__"])
         continue
     p = r["payload"]
-    count = len(p.get("cards", p.get("contents", [])))
-    print(f"  isError={r['isError']}  count={count}  error={p.get('error')}  {summarize_widget(p.get('widget'))}")
+    print(f"  isError={r['isError']}  {summarize_widget(p.get('widget'))}")
     ct = p.get("copy_text", "")
     print(f"  copy_text[0]: {ct.splitlines()[0] if ct else ''}")
 
 print("-" * 70)
-print("전체 copy_text 예시 (fetch_popular_card):")
-print(call_tool("fetch_popular_card", {})["payload"]["copy_text"])
+print("전체 copy_text 예시 (getPopularCreditCards):")
+print(call_tool("getPopularCreditCards", {})["payload"]["copy_text"])

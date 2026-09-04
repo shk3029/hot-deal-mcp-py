@@ -5,9 +5,9 @@
 MCI 백엔드 없이 카카오툴즈에 붙여 테스트하기 위한 것.
 
 ``data`` 딕셔너리로 어떤 조회인지 구분한다.
-- ``MSG``     : 카드명 검색 (fetch_card_search)
-- ``TAG_VL``  : 인기 카드 (fetch_popular_card)
-- ``CRD_BNF`` : 업종/혜택 기반 추천 (fetch_card_finder)
+- ``MSG``     : 카드명 검색 또는 "업종 카드종류" 추천 검색
+- ``TAG_VL``  : 인기 카드 (`getPopularCreditCards`)
+- ``CRD_BNF`` : 이전 fetch 계약과의 하위 호환용 업종 검색
 """
 
 from __future__ import annotations
@@ -139,6 +139,18 @@ class MockBackend:
 
     def _keyword_search(self, keyword: Any, size: int) -> dict[str, Any]:
         needle = str(keyword).strip()
+        # feature/test 추천 툴은 실제 MCI 검색과 동일하게 "업종 카드종류" 문장을 보낸다.
+        for suffix, card_type in ((" 체크카드", _CHECK_CARD_TYPE), (" 신용카드", _CREDIT_CARD_TYPE)):
+            if needle.endswith(suffix):
+                industry = Industry.resolve(needle[: -len(suffix)])
+                if industry is None:
+                    return {"GRID1": [], "TO_CT": 0}
+                rows = [
+                    row
+                    for row in self._rows
+                    if str(industry.code) in row.benefit_codes and row.card_type == card_type
+                ]
+                return _grid(rows[:size], len(rows))
         exact = self._by_title.get(needle)
         if exact is not None:
             return _grid([exact], 1)

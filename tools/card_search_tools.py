@@ -1,29 +1,37 @@
+"""feature/test 호환 카드 상세 조회 툴."""
+
 from __future__ import annotations
 
-import traceback
+import logging
+from typing import Annotated, Any
 
-from mcp.types import ToolAnnotations
+from mcp.types import CallToolResult, ToolAnnotations
+from pydantic import Field
 
+from domain.credit_card_name import CREDIT_CARD_NAMES, parameter_description, resolve_card_name
 from kakao.card_search import card_name_clarification, credit_card_detail
-from mci.mock_client import MockMciClient as MciClient  # feature/mock: 목업 데이터
-from schemas.card_finder_tools_schemas import CardDetail, CardDetailResult
-from tools.common import with_kakao
+from mci.card_client import create_card_client
+from tools.common import card_detail_from_mci, json_widget, log_tool_request
+
+logger = logging.getLogger(__name__)
 
 _TITLE = "신한카드 상품 상세 조회"
+_ERROR_MESSAGE = "### 카드 정보를 불러오지 못했습니다.\n\n잠시 후 다시 시도해 주세요."
 _DESCRIPTION = (
     "Retrieves details for a specific Shinhan Card(신한카드) product. Use when the user "
     "asks about the benefits, annual fee, eligibility, or other details of a named card. "
-    "Resolve the user's wording to one supported card name before calling."
+    "Resolve the user's wording to one supported cardName value before calling."
 )
+_TOOL_NAME = "getCreditCardDetail"
 
 
-def register_card_search_tools(mcp):
-    client = MciClient()
+def register_card_search_tools(mcp: Any) -> None:
+    client = create_card_client()
 
     @mcp.tool(
+        name=_TOOL_NAME,
         tags={"scope:admin", "scope:common", "scope:agca"},
         meta={"tool_code": "TL-COMM-005"},
-        title=_TITLE,
         description=_DESCRIPTION,
         annotations=ToolAnnotations(
             title=_TITLE,
@@ -33,72 +41,44 @@ def register_card_search_tools(mcp):
             openWorldHint=False,
         ),
     )
-    def fetch_card_search(
-        size: int = 5,
-        keyword: str = "",
-        sort: str = "score",
-        annualFeeMin: int = 0,
-        annualFeeMax: int = 5000000,
-    ) -> CardDetailResult:
-        """
-        키워드(카드명)로 신한카드 상품 한 장의 상세 정보를 조회합니다.
-        """
-        if not keyword or not keyword.strip():
-            raise ValueError("keyword는 필수 입력값입니다.")
-
+    def get_credit_card_detail(
+        cardName: Annotated[
+            str,
+            Field(
+                description=parameter_description(),
+                json_schema_extra={"enum": CREDIT_CARD_NAMES},
+            ),
+        ],
+    ) -> CallToolResult:
+        log_tool_request(_TOOL_NAME, {"cardName": cardName})
         try:
-            data = {
-                "MSG": keyword,
-                "SIZ": size,
-                "QEE": sort,
-                "AFE_MIN_VL": annualFeeMin,
-                "AFE_MAX_VL": annualFeeMax,
-            }
+            try:
+                resolved_name = resolve_card_name(cardName)
+            except ValueError:
+                return json_widget(card_name_clarification(), tool_name=_TOOL_NAME)
 
-            ret = client.call_with_itf_id("EGN00001", data=data, include_sensitive=True)
-
-            print(f"[DEBUG] ret type: {type(ret)}")
-            print(f"[DEBUG] ret value: {ret}")
-
-            if not isinstance(ret, dict):
-                return CardDetailResult(
-                    error=f"카드 조회 결과를 가져오지 못했습니다. (ret type: {type(ret)})"
-                )
-
-            grid1 = ret.get("GRID1", [])
-
-            print(f"[DEBUG] grid1: {grid1}")
-
-            if not grid1:
-                return with_kakao(
-                    CardDetailResult(error="해당 카드를 찾지 못했습니다."),
-                    card_name_clarification(),
-                )
-
-            cards = [
-                CardDetail(
-                    CRD_PD_PGE_N=item.get("CRD_PD_PGE_N", ""),
-                    CRD_PD_NM=item.get("CRD_PD_NM", ""),
-                    CRD_PD_DESC=item.get("CRD_PD_DESC", ""),
-                    CRD_PD_URL=item.get("CRD_PD_URL", ""),
-                    CRD_PD_IMG_URL=item.get("CRD_PD_IMG_URL", ""),
-                    CRD_PD_AFE=item.get("CRD_PD_AFE", 0),
-                    CRD_PD_BNF_CD=item.get("CRD_PD_BNF_CD", ""),
-                    CRD_PD_BNF_NM1=item.get("CRD_PD_BNF_NM1", ""),
-                    CRD_PD_BNF_NM2=item.get("CRD_PD_BNF_NM2", ""),
-                    CRD_PD_BNF_NM3=item.get("CRD_PD_BNF_NM3", ""),
-                    CRD_PD_BNF_DL1=item.get("CRD_PD_BNF_DL1", ""),
-                    CRD_PD_BNF_DL2=item.get("CRD_PD_BNF_DL2", ""),
-                    CRD_PD_BNF_DL3=item.get("CRD_PD_BNF_DL3", ""),
-                )
-                for item in grid1
-            ]
-
-            result = CardDetailResult(
-                cards=cards, totalCount=ret.get("TO_CT", len(cards))
+            result = client.call_with_itf_id(
+                "EGN00001",
+                data={
+                    "MSG": resolved_name,
+                    "SIZ": 5,
+                    "QEE": "score",
+                    "AFE_MIN_VL": 0,
+                    "AFE_MAX_VL": 5_000_000,
+                },
+                include_sensitive=True,
             )
-            return with_kakao(result, credit_card_detail(cards[0]))
-
-        except Exception as e:
-            print(f"[ERROR] {traceback.format_exc()}")
-            return CardDetailResult(error=f"카드 조회 중 오류가 발생했습니다: {e}")
+            if not isinstance(result, dict) or not isinstance(result.get("GRID1", []), list):
+                raise TypeError("MCI 카드 상세 응답 형식이 올바르지 않습니다.")
+            cards = [
+                card_detail_from_mci(item)
+                for item in result.get("GRID1", [])
+                if isinstance(item, dict)
+            ]
+            exact = next((card for card in cards if card.CRD_PD_NM == resolved_name), None)
+            if exact is None:
+                return json_widget(card_name_clarification(), tool_name=_TOOL_NAME)
+            return json_widget(credit_card_detail(exact), tool_name=_TOOL_NAME)
+        except Exception as exception:
+            logger.exception("MCP 툴 처리 실패 - tool=getCreditCardDetail")
+            raise RuntimeError(_ERROR_MESSAGE) from exception

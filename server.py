@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
@@ -41,6 +42,45 @@ def _tool(*args, tags: set[str] | None = None, meta: dict | None = None, **kwarg
 mcp.tool = _tool
 
 register_tools(mcp)
+
+
+def _match_spring_ai_schema(schema: dict[str, Any]) -> None:
+    """Pydantic 입력 스키마를 feature/test의 Spring MCP 형태로 정규화한다."""
+
+    source_properties: dict[str, Any] = schema.get("properties") or {}
+    properties: dict[str, Any] = {}
+    for name, source in source_properties.items():
+        base_type = source.get("type")
+        if isinstance(source.get("anyOf"), list):
+            base_type = next(
+                (
+                    entry.get("type")
+                    for entry in source["anyOf"]
+                    if entry.get("type") != "null"
+                ),
+                base_type,
+            )
+        prop: dict[str, Any] = {"type": base_type}
+        if base_type == "integer":
+            prop["format"] = "int32"
+        prop["description"] = source.get("description", "")
+        if "enum" in source:
+            prop["enum"] = source["enum"]
+        properties[name] = prop
+
+    normalized: dict[str, Any] = {
+        "type": "object",
+        "properties": properties,
+        "required": list(schema.get("required") or []),
+    }
+    if "cardName" in properties:
+        normalized["additionalProperties"] = False
+    schema.clear()
+    schema.update(normalized)
+
+
+for _registered_tool in mcp._tool_manager.list_tools():
+    _match_spring_ai_schema(_registered_tool.parameters)
 
 
 def main() -> None:
