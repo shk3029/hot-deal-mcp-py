@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Annotated, Any
 
-from mcp.types import CallToolResult, ToolAnnotations
+from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from domain.credit_card_name import CREDIT_CARD_NAMES, parameter_description, resolve_card_name
@@ -33,6 +33,7 @@ def register_card_search_tools(mcp: Any) -> None:
         tags={"scope:admin", "scope:common", "scope:agca"},
         meta={"tool_code": "TL-COMM-005"},
         description=_DESCRIPTION,
+        structured_output=False,
         annotations=ToolAnnotations(
             title=_TITLE,
             readOnlyHint=True,
@@ -49,7 +50,7 @@ def register_card_search_tools(mcp: Any) -> None:
                 json_schema_extra={"enum": CREDIT_CARD_NAMES},
             ),
         ],
-    ) -> CallToolResult:
+    ) -> str:
         log_tool_request(_TOOL_NAME, {"cardName": cardName})
         try:
             try:

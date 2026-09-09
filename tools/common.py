@@ -6,7 +6,6 @@ import json
 import logging
 from typing import Any
 
-from mcp.types import CallToolResult, TextContent
 from schemas.card_finder_tools_schemas import CardDetail, PlayMcpWidgetResponse
 
 audit_logger = logging.getLogger("mcp.tool.audit")
@@ -22,8 +21,8 @@ def log_tool_request(tool_name: str, arguments: dict[str, Any]) -> None:
     )
 
 
-def json_widget(payload: dict[str, Any], *, tool_name: str) -> CallToolResult:
-    """위젯 JSON을 structuredContent 없이 MCP text content로 반환한다."""
+def json_widget(payload: dict[str, Any], *, tool_name: str) -> str:
+    """FastMCP가 단일 TextContent로 변환할 위젯 JSON 문자열을 반환한다."""
 
     validated = PlayMcpWidgetResponse.model_validate(payload)
     response_json = json.dumps(
@@ -36,15 +35,7 @@ def json_widget(payload: dict[str, Any], *, tool_name: str) -> CallToolResult:
         tool_name,
         response_json,
     )
-    return CallToolResult(
-        content=[
-            TextContent(
-                type="text",
-                text=response_json,
-            )
-        ],
-        isError=False,
-    )
+    return response_json
 
 
 def card_detail_from_mci(item: dict[str, Any]) -> CardDetail:

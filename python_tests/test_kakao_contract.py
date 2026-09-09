@@ -16,6 +16,7 @@ from mci.mock_client import MockMciClient
 # 회귀 테스트는 내부 MCI 설정과 네트워크에 의존하지 않도록 목업을 명시한다.
 os.environ.setdefault("CARD_DATA_SOURCE", "mock")
 
+from main import _headers_for_log
 from server import mcp
 from tools.finance_tips.constants import CATEGORY_MAP
 
@@ -34,8 +35,8 @@ def listed_tools():
 
 def call(name: str, *args):
     result = mcp._tool_manager.get_tool(name).fn(*args)
-    assert result.structuredContent is None
-    payload = json.loads(result.content[0].text)
+    assert isinstance(result, str)
+    payload = json.loads(result)
     assert set(payload) == {"widget", "copy_text"}
     return payload
 
@@ -43,6 +44,7 @@ def call(name: str, *args):
 def test_feature_test_tool_names_and_codes_are_exposed():
     tools = listed_tools()
     assert set(tools) == EXPECTED_NAMES
+    assert all(tool.outputSchema is None for tool in tools.values())
     assert tools["getCreditCardRecommendationsWithSelector"].meta["tool_code"] == "TL-COMM-004"
     assert tools["getCreditCardDetail"].meta["tool_code"] == "TL-COMM-005"
     assert tools["getPopularCreditCards"].meta["tool_code"] == "TL-COMM-006"
@@ -83,6 +85,29 @@ def test_all_tools_return_only_kakao_widget_contract():
     assert call("getCreditCardDetail", "신한카드 Mr.Life")["widget"]["type"] == "Card"
     assert call("getPopularCreditCards")["widget"]["type"] == "Card"
     assert call("getFinancialLifeKnowledgeArticles", "카드연구소")["widget"]["type"] == "ListView"
+
+
+def test_fastmcp_conversion_returns_only_text_content_without_structured_output():
+    cases = {
+        "getCreditCardRecommendationsWithSelector": {
+            "industry": 2,
+            "annualFee": "0~1만원대",
+            "cardType": 1,
+            "sort": "출시일순",
+        },
+        "getCreditCardDetail": {"cardName": "신한카드 Mr.Life"},
+        "getPopularCreditCards": {},
+        "getFinancialLifeKnowledgeArticles": {"category": "금융"},
+    }
+
+    for name, arguments in cases.items():
+        tool = mcp._tool_manager.get_tool(name)
+        converted = asyncio.run(tool.run(arguments, convert_result=True))
+
+        assert isinstance(converted, list)
+        assert len(converted) == 1
+        assert converted[0].type == "text"
+        assert set(json.loads(converted[0].text)) == {"widget", "copy_text"}
 
 
 def test_empty_card_result_shows_guidance_and_more_cards_button():
@@ -183,3 +208,23 @@ def test_card_data_source_rejects_unknown_value(monkeypatch):
 
     with pytest.raises(RuntimeError, match="CARD_DATA_SOURCE"):
         create_card_client()
+
+
+def test_http_header_logging_redacts_credentials():
+    headers = _headers_for_log(
+        {
+            "content-type": "application/json",
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer secret-value",
+            "cookie": "session=secret-value",
+            "x-api-key": "secret-value",
+            "x-kakao-signature": "secret-value",
+        }
+    )
+
+    assert headers["content-type"] == "application/json"
+    assert headers["accept"] == "application/json, text/event-stream"
+    assert headers["authorization"] == "<redacted>"
+    assert headers["cookie"] == "<redacted>"
+    assert headers["x-api-key"] == "<redacted>"
+    assert headers["x-kakao-signature"] == "<redacted>"

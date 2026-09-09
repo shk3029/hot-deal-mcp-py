@@ -6,7 +6,7 @@ import logging
 import re
 from typing import Annotated, Any
 
-from mcp.types import CallToolResult, ToolAnnotations
+from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from domain.annual_fee_band import AnnualFeeBand
@@ -47,6 +47,7 @@ def register_card_finder_tools(mcp: Any) -> None:
         meta={"tool_code": "TL-COMM-004"},
         title=_TITLE,
         description=_DESCRIPTION,
+        structured_output=False,
         annotations=ToolAnnotations(
             title=_TITLE,
             readOnlyHint=True,
@@ -86,7 +87,7 @@ def register_card_finder_tools(mcp: Any) -> None:
                 "출시일순은 최신 출시 카드부터, 연회비순은 낮은 연회비부터 정렬합니다."
             )),
         ] = None,
-    ) -> CallToolResult:
+    ) -> str:
         log_tool_request(
             _TOOL_NAME,
             {

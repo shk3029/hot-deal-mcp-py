@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from mcp.types import CallToolResult, ToolAnnotations
+from mcp.types import ToolAnnotations
 
 from kakao.popular_card import popular_credit_card_list
 from mci.card_client import create_card_client
@@ -32,6 +32,7 @@ def register_popular_card_tools(mcp: Any) -> None:
         meta={"tool_code": "TL-COMM-006"},
         title=_TITLE,
         description=_DESCRIPTION,
+        structured_output=False,
         annotations=ToolAnnotations(
             title=_TITLE,
             readOnlyHint=True,
@@ -40,7 +41,7 @@ def register_popular_card_tools(mcp: Any) -> None:
             openWorldHint=False,
         ),
     )
-    def get_popular_credit_cards() -> CallToolResult:
+    def get_popular_credit_cards() -> str:
         log_tool_request(_TOOL_NAME, {})
         try:
             result = client.call_with_itf_id(

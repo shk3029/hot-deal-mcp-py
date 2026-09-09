@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Annotated, Any
 
-from mcp.types import CallToolResult, ToolAnnotations
+from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from domain.financial_knowledge import FinancialKnowledgeCategory
@@ -35,6 +35,7 @@ def register_finance_tips_tools(mcp: Any) -> None:
         meta={"tool_code": "TL-COMM-007"},
         title=_TITLE,
         description=_DESCRIPTION,
+        structured_output=False,
         annotations=ToolAnnotations(
             title=_TITLE,
             readOnlyHint=True,
@@ -54,7 +55,7 @@ def register_finance_tips_tools(mcp: Any) -> None:
                 "'절약 팁'은 카드연구소를 사용합니다. 명확하지 않으면 트렌드를 사용합니다."
             )),
         ] = None,
-    ) -> CallToolResult:
+    ) -> str:
         log_tool_request(_TOOL_NAME, {"category": category})
         try:
             parsed = FinancialKnowledgeCategory.from_string(category)
