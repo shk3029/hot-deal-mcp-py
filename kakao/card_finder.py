@@ -42,16 +42,6 @@ def industry_selector() -> WidgetResponse:
     widget = {"type": "Card", "children": children}
     return response(widget, "원하시는 업종을 선택해 주세요.")
 
-
-def annual_fee_selector() -> WidgetResponse:
-    children: list[Widget] = [
-        {"type": "Text", "value": "원하시는 연회비 구간을 선택해주세요"}
-    ]
-    children.extend(selector_button_rows(AnnualFeeBand.display_names()))
-    widget = {"type": "Card", "children": children}
-    return response(widget, "원하시는 연회비 구간을 선택해 주세요.")
-
-
 def credit_card_guide_list(
     cards: list[Card],
     industry: Industry,
@@ -157,7 +147,7 @@ def _to_credit_card_list_row(searched_industry: Industry, card: Card) -> Widget:
         "type": "Button",
         "label": "",
         "iconEnd": "chevron-right",
-        "iconSize": "xl",        # 버튼 아이콘은 2xl까지
+        "iconSize": "xl",
         "variant": "ghost",
         "uniform": True,
         "onClickAction": send_user_message_action(f"{card.CRD_PD_NM} 혜택 알려줘"),

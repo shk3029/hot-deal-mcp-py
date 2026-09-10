@@ -81,7 +81,7 @@ def financial_knowledge_list(
                     "variant": "outline",
                     "block": True,
                     "onClickAction": send_user_message_action(
-                        f"{next_display} 금융생활지식 보여줘"
+                        f"<{next_display}> 금융생활지식 보여줘"
                     ),
                 }
             ],

@@ -16,8 +16,6 @@ SELECTOR_BUTTONS_PER_ROW = 4
 # 인기 카드 TOP10 차트 (인기카드 위젯의 "차트 보러가기" 버튼)
 CARD_RANKING_URL = (
     "https://www.shinhancard.com/pconts/html/landing/2013846_2424.html?Tab=tab2"
-    "&utm_source=naver_mo&utm_medium=brandsearch_sa"
-    "&utm_campaign=main&utm_content=news"
 )
 # 카드 검색 화면 (카드 추천 위젯의 "더 많은 카드 보기" 버튼)
 CARD_SEARCH_URL = (

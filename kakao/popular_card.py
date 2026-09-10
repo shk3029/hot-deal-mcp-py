@@ -72,7 +72,7 @@ def _popular_credit_card_row(rank: int, card: CardDetail) -> Widget:
         "alt": f"{card.CRD_PD_NM} 카드 이미지",
         "width": 112,
         "height": 72,
-        "fit": "cover",
+        "fit": "contain",
         "radius": "sm",
     }
     card_details = {
@@ -96,10 +96,11 @@ def _popular_credit_card_row(rank: int, card: CardDetail) -> Widget:
     }
     click_indicator = {
         "type": "Button",
-        "label": ">",
+        "label": "",
+        "iconEnd": "chevron-right",
+        "iconSize": "xl",
         "variant": "ghost",
         "uniform": True,
-        "size": "xl",
         "onClickAction": send_user_message_action(f"{card.CRD_PD_NM} 혜택 알려줘"),
     }
     return {
