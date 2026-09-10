@@ -72,7 +72,7 @@ def _popular_credit_card_row(rank: int, card: CardDetail) -> Widget:
         "alt": f"{card.CRD_PD_NM} 카드 이미지",
         "width": 112,
         "height": 72,
-        "fit": "contain",
+        "fit": "cover",
         "radius": "sm",
     }
     card_details = {

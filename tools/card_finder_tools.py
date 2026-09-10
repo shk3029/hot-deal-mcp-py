@@ -47,7 +47,6 @@ def register_card_finder_tools(mcp: Any) -> None:
         meta={"tool_code": "TL-COMM-004"},
         title=_TITLE,
         description=_DESCRIPTION,
-        structured_output=False,
         annotations=ToolAnnotations(
             title=_TITLE,
             readOnlyHint=True,

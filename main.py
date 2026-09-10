@@ -1,4 +1,4 @@
-"""FastAPI 진입점. 공식 ``mcp`` SDK 의 streamable-HTTP ASGI 앱을 마운트한다.
+"""FastAPI 진입점. ``fastmcp`` 의 streamable-HTTP ASGI 앱을 마운트한다.
 
 - ``POST /mcp``  : MCP (streamable HTTP, stateless + JSON 응답)
 - ``GET  /health``: 헬스 체크
@@ -46,10 +46,13 @@ def _headers_for_log(headers: Mapping[str, str]) -> dict[str, str]:
     }
 
 
+mcp_app = mcp.http_app(path="/mcp", stateless_http=True, json_response=True)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # 마운트된 하위 앱의 lifespan 은 부모가 자동 실행하지 않으므로 직접 구동한다.
-    async with mcp.session_manager.run():
+    async with mcp_app.lifespan(mcp_app):
         yield
 
 
@@ -85,6 +88,29 @@ async def log_mcp_http_headers(request: Request, call_next) -> Response:
             separators=(",", ":"),
         ),
     )
+    if response.headers.get("content-type", "").split(";", 1)[0] == "application/json":
+        body_iterator = response.body_iterator
+
+        async def log_response_body():
+            chunks = []
+            async for chunk in body_iterator:
+                chunks.append(chunk.encode("utf-8") if isinstance(chunk, str) else chunk)
+                yield chunk
+            body = b"".join(chunks)
+            if body:
+                try:
+                    formatted = json.dumps(json.loads(body), ensure_ascii=False, indent=2)
+                except (ValueError, UnicodeDecodeError):
+                    formatted = body.decode("utf-8", errors="replace")
+                logger.info(
+                    "MCP HTTP response body - method=%s, path=%s, status=%s\n%s",
+                    request.method,
+                    request.url.path,
+                    response.status_code,
+                    formatted,
+                )
+
+        response.body_iterator = log_response_body()
     return response
 
 
@@ -93,5 +119,5 @@ def health() -> dict[str, str]:
     return {"status": "UP"}
 
 
-# streamable_http_app() 자체가 streamable_http_path(=/mcp)에서 서비스하므로 루트에 마운트한다.
-app.mount("/", mcp.streamable_http_app())
+# MCP 하위 앱이 /mcp 경로를 제공하므로 루트에 마운트한다.
+app.mount("/", mcp_app)

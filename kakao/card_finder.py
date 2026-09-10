@@ -155,10 +155,11 @@ def _to_credit_card_list_row(searched_industry: Industry, card: Card) -> Widget:
     }
     click_indicator = {
         "type": "Button",
-        "label": ">",
+        "label": "",
+        "iconEnd": "chevron-right",
+        "iconSize": "xl",        # 버튼 아이콘은 2xl까지
         "variant": "ghost",
         "uniform": True,
-        "size": "xl",
         "onClickAction": send_user_message_action(f"{card.CRD_PD_NM} 혜택 알려줘"),
     }
     return {

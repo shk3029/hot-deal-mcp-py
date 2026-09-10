@@ -32,7 +32,6 @@ def register_popular_card_tools(mcp: Any) -> None:
         meta={"tool_code": "TL-COMM-006"},
         title=_TITLE,
         description=_DESCRIPTION,
-        structured_output=False,
         annotations=ToolAnnotations(
             title=_TITLE,
             readOnlyHint=True,

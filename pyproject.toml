@@ -1,14 +1,15 @@
 [project]
 name = "hot-deal-mcp-py"
 version = "0.0.1"
-description = "KakaoTools-compatible Shinhan credit card guide MCP server (FastAPI + official mcp SDK)"
+description = "KakaoTools-compatible Shinhan credit card guide MCP server (FastAPI + FastMCP)"
 requires-python = ">=3.11"
 dependencies = [
-    "mcp[cli]>=1.26.0,<2",
+    "mcp>=1.27.0,<2",
     "fastapi>=0.115,<1",
     "uvicorn[standard]>=0.30,<1",
     "httpx>=0.27,<1",
     "pyyaml>=6,<7",
+    "fastmcp==3.2.4",
 ]
 
 [dependency-groups]

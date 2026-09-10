@@ -4,7 +4,7 @@
 선택합니다. 기본값은 실제 `mci`이며, 목업은 `CARD_DATA_SOURCE=mock`을 명시할 때만
 사용합니다.
 
-신한카드 상품 안내 MCP 서버. 공식 `mcp` SDK(FastMCP)로 Tool 을 정의하고,
+신한카드 상품 안내 MCP 서버. `fastmcp==3.2.4`로 Tool 을 정의하고,
 streamable-HTTP ASGI 앱을 **FastAPI** 에 마운트해 `/mcp` 로 제공합니다.
 
 툴은 사내 스타일(`register_*_tools(mcp)` + `@mcp.tool(tags=..., meta=...)`)로 작성돼
@@ -101,7 +101,7 @@ kakao/                   카카오툴즈 응답 빌더 (툴별 분리)
   finance_tips.py        금융생활지식 목록
 tools/
   __init__.py            REGISTER_TOOLS — 등록 함수 화이트리스트
-  common.py              @mcp.tool 래퍼(tags→meta) + with_kakao 헬퍼
+  common.py              카카오 위젯 JSON 직렬화 + 툴 감사 로그
   card_finder_tools.py   getCreditCardRecommendationsWithSelector
   card_search_tools.py   getCreditCardDetail
   popular_card_tools.py  getPopularCreditCards

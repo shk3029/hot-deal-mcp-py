@@ -33,7 +33,6 @@ def register_card_search_tools(mcp: Any) -> None:
         tags={"scope:admin", "scope:common", "scope:agca"},
         meta={"tool_code": "TL-COMM-005"},
         description=_DESCRIPTION,
-        structured_output=False,
         annotations=ToolAnnotations(
             title=_TITLE,
             readOnlyHint=True,
@@ -53,15 +52,10 @@ def register_card_search_tools(mcp: Any) -> None:
     ) -> str:
         log_tool_request(_TOOL_NAME, {"cardName": cardName})
         try:
-            try:
-                resolved_name = resolve_card_name(cardName)
-            except ValueError:
-                return json_widget(card_name_clarification(), tool_name=_TOOL_NAME)
-
             result = client.call_with_itf_id(
-                "EGN00001",
+                "EGN00002",
                 data={
-                    "MSG": resolved_name,
+                    "MSG": cardName,
                     "SIZ": 5,
                     "QEE": "score",
                     "AFE_MIN_VL": 0,
@@ -76,10 +70,18 @@ def register_card_search_tools(mcp: Any) -> None:
                 for item in result.get("GRID1", [])
                 if isinstance(item, dict)
             ]
-            exact = next((card for card in cards if card.CRD_PD_NM == resolved_name), None)
-            if exact is None:
+            
+            valid_cards = [
+                card for card in cards 
+                if card.CRD_PD_NM.strip() in CREDIT_CARD_NAMES
+            ]
+        
+            if not valid_cards:
+                logger.warning("지원하지 않는 카드 상품명 - MCI 응답 카드명=%s 이 CREDIT_CARD_NAMES에 없음", [card.CRD_PD_NM for card in cards])
                 return json_widget(card_name_clarification(), tool_name=_TOOL_NAME)
-            return json_widget(credit_card_detail(exact), tool_name=_TOOL_NAME)
+            
+            return json_widget(credit_card_detail(valid_cards[0]), tool_name=_TOOL_NAME)
+        
         except Exception as exception:
             logger.exception("MCP 툴 처리 실패 - tool=getCreditCardDetail")
             raise RuntimeError(_ERROR_MESSAGE) from exception

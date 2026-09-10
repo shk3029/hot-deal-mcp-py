@@ -18,7 +18,7 @@ base_prd_url:
 
 # 툴이 호출하는 ITF ID. 카드 4종 툴은 모두 EGN00001(검색 인터페이스)만 쓴다.
 interfaces:
-  EGN00001:
+  EGN00002:
     path: "/<mci-service-path>"   # _build_url 에서 base_*_url[target] 뒤에 붙는 경로
     rp_sv_cd: "<응답서비스코드>"    # RP_SV_CD / DATA_TS_CD 헤더로 들어감
     target: "internal"             # base_*_url 의 키

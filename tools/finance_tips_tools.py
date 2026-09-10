@@ -35,7 +35,6 @@ def register_finance_tips_tools(mcp: Any) -> None:
         meta={"tool_code": "TL-COMM-007"},
         title=_TITLE,
         description=_DESCRIPTION,
-        structured_output=False,
         annotations=ToolAnnotations(
             title=_TITLE,
             readOnlyHint=True,

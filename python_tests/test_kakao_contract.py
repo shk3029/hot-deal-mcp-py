@@ -30,11 +30,11 @@ EXPECTED_NAMES = {
 
 
 def listed_tools():
-    return {tool.name: tool for tool in asyncio.run(mcp.list_tools())}
+    return {tool.name: tool.to_mcp_tool() for tool in asyncio.run(mcp.list_tools())}
 
 
 def call(name: str, *args):
-    result = mcp._tool_manager.get_tool(name).fn(*args)
+    result = asyncio.run(mcp.get_tool(name)).fn(*args)
     assert isinstance(result, str)
     payload = json.loads(result)
     assert set(payload) == {"widget", "copy_text"}
@@ -44,7 +44,7 @@ def call(name: str, *args):
 def test_feature_test_tool_names_and_codes_are_exposed():
     tools = listed_tools()
     assert set(tools) == EXPECTED_NAMES
-    assert all(tool.outputSchema is None for tool in tools.values())
+    assert all(tool.outputSchema["properties"]["result"]["type"] == "string" for tool in tools.values())
     assert tools["getCreditCardRecommendationsWithSelector"].meta["tool_code"] == "TL-COMM-004"
     assert tools["getCreditCardDetail"].meta["tool_code"] == "TL-COMM-005"
     assert tools["getPopularCreditCards"].meta["tool_code"] == "TL-COMM-006"
@@ -87,7 +87,7 @@ def test_all_tools_return_only_kakao_widget_contract():
     assert call("getFinancialLifeKnowledgeArticles", "카드연구소")["widget"]["type"] == "ListView"
 
 
-def test_fastmcp_conversion_returns_only_text_content_without_structured_output():
+def test_fastmcp_conversion_returns_text_and_structured_string_result():
     cases = {
         "getCreditCardRecommendationsWithSelector": {
             "industry": 2,
@@ -101,13 +101,16 @@ def test_fastmcp_conversion_returns_only_text_content_without_structured_output(
     }
 
     for name, arguments in cases.items():
-        tool = mcp._tool_manager.get_tool(name)
-        converted = asyncio.run(tool.run(arguments, convert_result=True))
+        tool = asyncio.run(mcp.get_tool(name))
+        result = asyncio.run(tool.run(arguments))
+        converted = result.content
 
         assert isinstance(converted, list)
         assert len(converted) == 1
         assert converted[0].type == "text"
+        assert result.structured_content == {"result": converted[0].text}
         assert set(json.loads(converted[0].text)) == {"widget", "copy_text"}
+
 
 
 def test_empty_card_result_shows_guidance_and_more_cards_button():
@@ -248,3 +251,55 @@ def test_http_header_logging_redacts_credentials():
     assert headers["cookie"] == "<redacted>"
     assert headers["x-api-key"] == "<redacted>"
     assert headers["x-kakao-signature"] == "<redacted>"
+
+
+def test_fastmcp_http_transport_preserves_tool_contract(caplog):
+    from fastapi.testclient import TestClient
+    from main import app
+
+    caplog.set_level(logging.INFO, logger="main")
+    headers = {"Accept": "application/json, text/event-stream"}
+    with TestClient(app) as client:
+        assert client.get("/health").json() == {"status": "UP"}
+
+        def rpc(method, params):
+            response = client.post(
+                "/mcp",
+                headers=headers,
+                json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
+            )
+            assert response.status_code == 200
+            body_logs = [
+                record.getMessage().split("\n", 1)[1]
+                for record in caplog.records
+                if record.getMessage().startswith("MCP HTTP response body -")
+            ]
+            assert json.loads(body_logs[-1]) == response.json()
+            assert '\n  "jsonrpc": "2.0"' in body_logs[-1]
+            return response.json()["result"]
+
+        initialized = rpc("initialize", {
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": {"name": "contract-test", "version": "1.0"},
+        })
+        assert initialized["serverInfo"]["version"] == "0.0.1"
+        tools = rpc("tools/list", {})["tools"]
+        assert {tool["name"] for tool in tools} == EXPECTED_NAMES
+        assert all(tool["outputSchema"]["properties"]["result"]["type"] == "string" for tool in tools)
+        result = rpc("tools/call", {
+            "name": "getFinancialLifeKnowledgeArticles",
+            "arguments": {"category": "금융"},
+        })
+        assert not result.get("isError")
+        assert len(result["content"]) == 1
+        assert result["content"][0]["type"] == "text"
+        assert result["structuredContent"] == {"result": result["content"][0]["text"]}
+        assert set(json.loads(result["content"][0]["text"])) == {"widget", "copy_text"}
+
+        popular = rpc("tools/call", {
+            "name": "getPopularCreditCards", "arguments": {},
+        })
+        assert popular["isError"] is False
+        assert popular["structuredContent"] == {"result": popular["content"][0]["text"]}
+        assert set(json.loads(popular["content"][0]["text"])) == {"widget", "copy_text"}
