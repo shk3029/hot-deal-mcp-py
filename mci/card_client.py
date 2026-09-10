@@ -19,67 +19,60 @@ _MCI_SOURCE = "mci"
 
 class CardClient(Protocol):
     def call_with_itf_id(
-        self,
-        itf_id: str,
-        *,
-        data: dict[str, Any],
-        include_sensitive: bool = False,
+            self,
+            itf_id: str,
+            *,
+            data: dict[str, Any],
+            include_sensitive: bool = False,
     ) -> dict[str, Any]: ...
 
 
 def create_card_client() -> CardClient:
     """``CARD_DATA_SOURCE`` 값에 맞는 카드 데이터 클라이언트를 생성한다.
-
     기본값은 실제 ``mci``이다. 외부망/로컬에서 ``mock``을 명시한 경우에만
     목업 모듈을 지연 로딩하므로 MCI 설정 파일 없이 실행할 수 있다.
     """
-
     source = os.getenv(_DATA_SOURCE_ENV, _MCI_SOURCE).strip().lower()
     if source == _MCI_SOURCE:
         from mci.mci_client import MciClient
-
         client: CardClient = MciClient()
     elif source == _MOCK_SOURCE:
         # 기존 feature/mock 동작과 목 데이터를 그대로 사용한다.
         from mci.mock_client import MockMciClient
-
         client = MockMciClient()
     else:
         raise RuntimeError(
             f"{_DATA_SOURCE_ENV}는 '{_MOCK_SOURCE}' 또는 '{_MCI_SOURCE}'여야 합니다: {source!r}"
-        )
 
+        )
     logger.info("Card data source selected: %s", source)
     return client
 
-
 class MockCardClient:
+
     def __init__(self, data_path: Path | None = None) -> None:
         path = data_path or Path(__file__).with_name("card_mock_data.json")
         payload = json.loads(path.read_text(encoding="utf-8"))
         self._cards = [hit["_source"] for hit in payload["hits"]["hits"]]
 
     def call_with_itf_id(
-        self,
-        itf_id: str,
-        *,
-        data: dict[str, Any],
-        include_sensitive: bool = False,
+            self,
+            itf_id: str,
+            *,
+            data: dict[str, Any],
+            include_sensitive: bool = False,
     ) -> dict[str, Any]:
         del include_sensitive
-        if itf_id != "EGN00001":
+        if itf_id != "EGN00002":
             raise ValueError(f"지원하지 않는 목업 인터페이스입니다: {itf_id}")
-
         cards = list(self._cards)
         cards = self._filter_by_annual_fee(cards, data)
-
         if data.get("MSG"):
             cards = self._search_by_keyword(cards, str(data["MSG"]))
         elif data.get("CRD_BNF"):
             cards = self._filter_by_benefit(cards, data["CRD_BNF"])
         elif data.get("TAG_VL"):
             cards = self._filter_by_tag(cards, str(data["TAG_VL"]))
-
         cards = self._sort(cards, str(data.get("QEE", "date")))
         total_count = len(cards)
         size = max(0, int(data.get("SIZ", 5)))
@@ -90,7 +83,7 @@ class MockCardClient:
 
     @staticmethod
     def _filter_by_annual_fee(
-        cards: list[dict[str, Any]], data: dict[str, Any]
+            cards: list[dict[str, Any]], data: dict[str, Any]
     ) -> list[dict[str, Any]]:
         minimum = int(data.get("AFE_MIN_VL", 0))
         maximum = int(data.get("AFE_MAX_VL", 5_000_000))
@@ -98,7 +91,7 @@ class MockCardClient:
 
     @staticmethod
     def _search_by_keyword(
-        cards: list[dict[str, Any]], keyword: str
+            cards: list[dict[str, Any]], keyword: str
     ) -> list[dict[str, Any]]:
         normalized = keyword.strip().casefold()
         if not normalized:
@@ -110,12 +103,12 @@ class MockCardClient:
             card
             for card in cards
             if normalized in card["pagetitle"].casefold()
-            or normalized in str(card.get("sh_keyword", "")).casefold()
+               or normalized in str(card.get("sh_keyword", "")).casefold()
         ]
 
     @staticmethod
     def _filter_by_benefit(
-        cards: list[dict[str, Any]], benefit: object
+            cards: list[dict[str, Any]], benefit: object
     ) -> list[dict[str, Any]]:
         industry = Industry.resolve(benefit)
         if industry is None:
@@ -128,15 +121,17 @@ class MockCardClient:
             if code in card.get("svtcd", []) and int(card.get("cardType", 1)) == card_type
         ]
 
+
     @staticmethod
     def _filter_by_tag(
-        cards: list[dict[str, Any]], tag: str
+            cards: list[dict[str, Any]], tag: str
     ) -> list[dict[str, Any]]:
         field = {
             "best": "pdbstf",
             "latest": "pdpfrf",
             "cashback": "pdcsbf",
         }.get(tag.strip().lower())
+
         return cards if field is None else [card for card in cards if card.get(field) == "Y"]
 
     @staticmethod
