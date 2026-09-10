@@ -1,7 +1,10 @@
-"""feature/test 호환 금융생활지식 툴."""
-
 from __future__ import annotations
+import asyncio
+import json
+from pathlib import Path
+from datetime import date, timedelta
 
+from mci.mci_client import MciClient
 import logging
 from typing import Annotated, Any
 

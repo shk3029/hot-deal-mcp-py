@@ -1,5 +1,4 @@
 """툴 모듈 공통 헬퍼."""
-
 from __future__ import annotations
 
 import json

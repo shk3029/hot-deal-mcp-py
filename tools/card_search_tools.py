@@ -1,6 +1,10 @@
-"""feature/test 호환 카드 상세 조회 툴."""
-
 from __future__ import annotations
+import asyncio
+import json
+from pathlib import Path
+from datetime import date, timedelta
+from mci.mci_client import MciClient
+
 
 import logging
 from typing import Annotated, Any
@@ -8,10 +12,12 @@ from typing import Annotated, Any
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from domain.credit_card_name import CREDIT_CARD_NAMES, parameter_description, resolve_card_name
+from domain.credit_card_name import CREDIT_CARD_NAMES, parameter_description
 from kakao.card_search import card_name_clarification, credit_card_detail
 from mci.card_client import create_card_client
 from tools.common import card_detail_from_mci, json_widget, log_tool_request
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -71,17 +77,31 @@ def register_card_search_tools(mcp: Any) -> None:
                 if isinstance(item, dict)
             ]
             
-            valid_cards = [
-                card for card in cards 
-                if card.CRD_PD_NM.strip() in CREDIT_CARD_NAMES
-            ]
-        
-            if not valid_cards:
-                logger.warning("지원하지 않는 카드 상품명 - MCI 응답 카드명=%s 이 CREDIT_CARD_NAMES에 없음", [card.CRD_PD_NM for card in cards])
-                return json_widget(card_name_clarification(), tool_name=_TOOL_NAME)
+            logger.info(
+                "MCI 응답 카드명 목록 - raw=%s",
+                [repr(card.CRD_PD_NM) for card in cards]  # repr()로 공백/특수문자 노출
+            )
             
+            valid_cards = [
+                card for card in cards
+                if card.CRD_PD_NM.strip() in CREDIT_CARD_NAMES
+            ]   
+            
+            # 2. 필터링 결과 확인d
+            logger.info(
+                "필터링 결과 - valid=%s / total=%d",
+                [card.CRD_PD_NM.strip() for card in valid_cards],
+                len(cards),
+            )
+
+            if not valid_cards:
+                logger.info("지원하지 않는 카드 상품명 - MCI 응답 카드명=%s 이 CREDIT_CARD_NAMES에 없음",
+                    [card.CRD_PD_NM for card in cards],
+                )
+                return json_widget(card_name_clarification(), tool_name=_TOOL_NAME)
+
             return json_widget(credit_card_detail(valid_cards[0]), tool_name=_TOOL_NAME)
-        
+
         except Exception as exception:
             logger.exception("MCP 툴 처리 실패 - tool=getCreditCardDetail")
             raise RuntimeError(_ERROR_MESSAGE) from exception

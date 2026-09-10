@@ -1,6 +1,10 @@
-"""feature/test 호환 인기 카드 TOP5 툴."""
-
 from __future__ import annotations
+import asyncio
+import json
+from pathlib import Path
+from datetime import date, timedelta
+
+from mci.mci_client import MciClient
 
 import logging
 from typing import Any
@@ -12,6 +16,7 @@ from mci.card_client import create_card_client
 from tools.common import card_detail_from_mci, json_widget, log_tool_request
 
 logger = logging.getLogger(__name__)
+
 
 _TITLE = "신한카드 인기 TOP5"
 _ERROR_MESSAGE = "### 인기 카드 정보를 불러오지 못했습니다.\n\n잠시 후 다시 시도해 주세요."
@@ -44,10 +49,11 @@ def register_popular_card_tools(mcp: Any) -> None:
         log_tool_request(_TOOL_NAME, {})
         try:
             result = client.call_with_itf_id(
-                "EGN00001",
+                "EGN00002",
                 data={
                     "SIZ": 5,
                     "QEE": "date",
+                    "CRD_TP": 1,
                     "TAG_VL": "best",
                     "AFE_MIN_VL": 0,
                     "AFE_MAX_VL": 5_000_000,

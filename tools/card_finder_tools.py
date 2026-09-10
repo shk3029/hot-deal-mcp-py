@@ -1,7 +1,13 @@
-"""feature/test 호환 카드 추천 툴. 데이터 조회만 EGN00001을 사용한다."""
-
 from __future__ import annotations
-
+import asyncio
+import json
+from pathlib import Path
+from datetime import date, timedelta
+from mci.mci_client import MciClient
+from schemas.card_finder_tools_schemas import (
+    Card,
+    CardsResult
+)
 import logging
 import re
 from typing import Annotated, Any
@@ -11,25 +17,34 @@ from pydantic import Field
 
 from domain.annual_fee_band import AnnualFeeBand
 from domain.card_sort_order import CardSortOrder
-from domain.industry import Industry
-from kakao.card_finder import annual_fee_selector, credit_card_guide_list, industry_selector
+from kakao.card_finder import credit_card_guide_list, industry_selector
 from mci.card_client import create_card_client
 from schemas.card_finder_tools_schemas import CardDetail
 from tools.common import card_detail_from_mci, json_widget, log_tool_request
+from domain.industry import Industry  
+
+
 
 logger = logging.getLogger(__name__)
 
 _TITLE = "소비 업종별 카드 안내 (선택 위젯)"
 _ERROR_MESSAGE = "### 카드 정보를 불러오지 못했습니다.\n\n잠시 후 다시 시도해 주세요."
 _DESCRIPTION = (
-    "Recommends Shinhan Card(신한카드) credit card benefit types based on the user's "
-    "preferred spending category and annual-fee range. Use for credit card recommendations, "
-    "comparisons, or category-specific benefits. Pass the closest supported category code as "
-    "industry; omit it when unclear to show a selector widget. Set annualFee to 0~1만원대, "
-    "2~3만원대, or 제한없음; use 제한없음 when the user does not specify a range. Recommend "
-    "credit cards by default. Set cardType to 2 only when the user explicitly asks for a check "
-    "card; youth category requests automatically return check cards. Set sort to 출시일순 or "
-    "연회비순; default to 출시일순 when the user does not specify sorting."
+    "Recommends Shinhan Card(신한카드) credit cards based on the user's preferred spending "
+    "category and annual-fee range. "
+    "MUST be called for ANY card recommendation request, including vague requests like "
+    "'카드 추천해줘', '나에게 맞는 카드', '좋은 카드 알려줘', '신한카드 추천' — "
+    "even when no specific category or fee is mentioned. "
+    "Use for credit card recommendations, comparisons, or category-specific benefits. "
+    "Pass the closest supported category code as industry; "
+    "omit it (set to null) when the user does not specify a category — this will show a category selector widget. "
+    "Set annualFee to EXACTLY one of: 0~1만원, 1~2만원, 2~3만원, 3~4만원, 4~5만원, 5~10만원, 10만원이상, 제한없음. "
+    "If the user mentions a fee above 10만원 or says '비싼', '고급', use 10만원 이상. "
+    "Always set annualFee; use 제한없음 when the user does not specify a range. "
+    "Recommend credit cards by default. Set cardType to 2 only when the user explicitly "
+    "asks for a check card; youth category requests automatically return check cards. "
+    "Set sort to 정확도순, 출시일순, 높은연회비순, or 낮은연회비순; "
+    "default to 출시일순 when the user does not specify sorting."
 )
 _CREDIT_CARD_TYPE = 1
 _CHECK_CARD_TYPE = 2
@@ -60,6 +75,7 @@ def register_card_finder_tools(mcp: Any) -> None:
             int | None,
             Field(description=(
                 "사용자가 할인이나 혜택을 원하는 업종에 해당하는 번호(1~24). "
+                "업종을 명시하지 않은 경우 반드시 null로 설정 — 업종 선택 위젯이 표시됩니다. "
                 "허용값: 1 어디서나, 2 주유, 3 대형마트, 4 편의점, 5 쇼핑, 6 영화/공연, 7 외식/배달, 8 카페, "
                 "9 대중교통, 10 병원/약국, 11 공과금, 12 통신, 13 교육/육아, 14 레저, 15 항공/마일리지, "
                 "16 공항/공항라운지, 17 뷰티, 18 간편결제, 19 구독, 20 여행/숙박, 21 금융, 22 할인, 23 적립, 24 청소년"
@@ -68,8 +84,12 @@ def register_card_finder_tools(mcp: Any) -> None:
         annualFee: Annotated[
             str | None,
             Field(description=(
-                "사용자가 원하는 연회비 구간. '3만원대'는 2~3만원대로 변환합니다. "
-                "허용값: 0~1만원대, 2~3만원대, 제한없음. 언급이 없거나 상관없으면 제한없음"
+                "사용자가 원하는 연회비 구간. "
+                "반드시 아래 허용값 중 하나를 정확히 입력해야 합니다: "
+                "0~1만원, 1~2만원, 2~3만원, 3~4만원, 4~5만원, 5~10만원, 10만원이상, 제한없음. "
+                "언급이 없거나 상관없으면 반드시 제한없음으로 설정. "
+                "10만원 초과 또는 고급/프리미엄 카드 요청 시 10만원 이상 사용. "
+                "절대 허용값 외의 문자열을 사용하지 말 것."
             )),
         ] = None,
         cardType: Annotated[
@@ -82,11 +102,15 @@ def register_card_finder_tools(mcp: Any) -> None:
         sort: Annotated[
             str | None,
             Field(description=(
-                "정렬 기준. 허용값: 출시일순, 연회비순. 언급이 없으면 출시일순을 사용합니다. "
-                "출시일순은 최신 출시 카드부터, 연회비순은 낮은 연회비부터 정렬합니다."
+                "정렬 기준. "
+                "허용값: 정확도순, 출시일순, 높은연회비순, 낮은연회비순. "
+                "언급이 없으면 출시일순을 사용합니다. "
+                "정확도순은 검색 적합도 기준, 출시일순은 최신 출시 카드부터, "
+                "높은연회비순은 높은 연회비부터, 낮은연회비순은 낮은 연회비부터 정렬합니다."
             )),
         ] = None,
     ) -> str:
+        print(f"[DEBUG] ▶ 툴 함수 진입! industry={industry!r}, annualFee={annualFee!r}, cardType={cardType!r}, sort={sort!r}")
         log_tool_request(
             _TOOL_NAME,
             {
@@ -113,6 +137,7 @@ def _recommend(
     card_type: int | None,
     sort: str | None,
 ) -> dict[str, Any]:
+    print(f"[DEBUG] annual_fee1: {annual_fee}")
     if industry_code is None:
         return industry_selector()
     try:
@@ -120,11 +145,14 @@ def _recommend(
     except ValueError:
         return industry_selector()
     try:
+        print(f"[DEBUG] annual_fee2: {annual_fee}")
         fee_band = AnnualFeeBand.from_string(annual_fee)
+        print(f"[DEBUG] annual_fee3: {annual_fee}")
     except ValueError:
-        return annual_fee_selector()
+        fee_band = AnnualFeeBand.from_string("제한없음")  # ✅ 제한없음으로 fallback
 
     sort_order = CardSortOrder.from_string(sort)
+    print(f"[DEBUG] sort 입력: {sort!r} → {sort_order} → {sort_order.api_code}")
     resolved_type = (
         _CHECK_CARD_TYPE
         if industry is Industry.YOUTH or card_type == _CHECK_CARD_TYPE
@@ -132,11 +160,12 @@ def _recommend(
     )
     type_name = "체크카드" if resolved_type == _CHECK_CARD_TYPE else "신용카드"
     result = client.call_with_itf_id(
-        "EGN00001",
+        "EGN00002",
         data={
-            "MSG": f"{industry.display_name} {type_name}",
+            "CRD_BNF": str(industry.code),
+            "CRD_TP": resolved_type,     
             "SIZ": _MCI_SEARCH_SIZE,
-            "QEE": "score",
+            "QEE": sort_order.api_code,
             "AFE_MIN_VL": fee_band.minimum,
             "AFE_MAX_VL": fee_band.maximum,
         },
@@ -153,7 +182,7 @@ def _recommend(
     cards = [card for card in cards if _matches_industry(card, industry)]
     cards = [card for card in cards if _matches_card_type(card, resolved_type)]
     cards = [card for card in cards if fee_band.matches(card.CRD_PD_AFE)]
-    _sort_cards(cards, sort_order)
+    # _sort_cards(cards, sort_order)
     return credit_card_guide_list(cards[:_MAX_RESULTS], industry, fee_band.display_name)
 
 
@@ -167,15 +196,21 @@ def _matches_card_type(card: CardDetail, card_type: int) -> bool:
     return is_check if card_type == _CHECK_CARD_TYPE else not is_check
 
 
-def _sort_cards(cards: list[CardDetail], order: CardSortOrder) -> None:
-    def page_number(card: CardDetail) -> int:
-        digits = "".join(re.findall(r"\d+", card.CRD_PD_PGE_N))
-        return int(digits or 0)
+# def _sort_cards(cards: list[CardDetail], order: CardSortOrder) -> None:
+#     """
+#     API(QEE)에서 이미 정렬된 결과를 반환하므로
+#     클라이언트 재정렬은 page_number 기준 보조 정렬만 수행합니다.
+#     연회비 정렬은 API에 위임하여 중복 정렬을 방지합니다.
+#     """
+#     def page_number(card: CardDetail) -> int:
+#         digits = "".join(re.findall(r"\d+", card.CRD_PD_PGE_N))
+#         return int(digits or 0)
 
-    cards.sort(key=lambda card: card.CRD_PD_NM)
-    if order is CardSortOrder.ANNUAL_FEE:
-        cards.sort(key=page_number, reverse=True)
-        cards.sort(key=lambda card: card.CRD_PD_AFE)
-    else:
-        cards.sort(key=lambda card: card.CRD_PD_AFE)
-        cards.sort(key=page_number, reverse=True)
+#     # 동일 조건 내 카드명 알파벳순 보조 정렬 (안정 정렬 활용)
+#     cards.sort(key=lambda card: card.CRD_PD_NM)
+
+#     # 페이지 번호 기준 보조 정렬만 유지 (API 정렬 순서 최대한 보존)
+#     cards.sort(key=page_number, reverse=True)
+ 
+
+ 
