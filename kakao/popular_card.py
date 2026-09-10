@@ -11,6 +11,7 @@ from kakao.common import (
     benefit_category_badge,
     open_url_action,
     response,
+    send_user_message_action,
 )
 from schemas.card_finder_tools_schemas import CardDetail
 
@@ -93,6 +94,14 @@ def _popular_credit_card_row(rank: int, card: CardDetail) -> Widget:
             },
         ],
     }
+    click_indicator = {
+        "type": "Button",
+        "label": ">",
+        "variant": "ghost",
+        "uniform": True,
+        "size": "xl",
+        "onClickAction": send_user_message_action(f"{card.CRD_PD_NM} 혜택 알려줘"),
+    }
     return {
         "type": "Row",
         "key": card.CRD_PD_NM,
@@ -110,5 +119,6 @@ def _popular_credit_card_row(rank: int, card: CardDetail) -> Widget:
             },
             card_image,
             card_details,
+            click_indicator,
         ],
     }

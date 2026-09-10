@@ -135,6 +135,26 @@ def test_empty_card_result_shows_guidance_and_more_cards_button():
     assert "[더 많은 카드 보기]" in payload["copy_text"]
 
 
+def test_popular_card_rows_open_the_same_card_detail_prompt_as_search_results():
+    payload = call("getPopularCreditCards")
+    rows = payload["widget"]["children"][2]["children"]
+
+    assert rows
+    for row in rows:
+        card_name = row["key"]
+        detail_button = row["children"][-1]
+        assert detail_button["type"] == "Button"
+        assert detail_button["label"] == ">"
+        assert detail_button["onClickAction"] == {
+            "payload": {
+                "target": {
+                    "type": "sendUserMessage",
+                    "properties": {"text": f"{card_name} 혜택 알려줘"},
+                }
+            }
+        }
+
+
 def test_restored_domain_normalization():
     assert AnnualFeeBand.from_string(None) is AnnualFeeBand.NO_LIMIT
     assert AnnualFeeBand.from_string("3만원대") is AnnualFeeBand.THIRTY_THOUSAND_RANGE
