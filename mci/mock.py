@@ -22,6 +22,7 @@ _DATA_FILE = Path(__file__).resolve().parent / "mock_data.json"
 
 _CHECK_CARD_TYPE = 2
 _CREDIT_CARD_TYPE = 1
+_SUPPORTED_ITF_IDS = frozenset({"EGN00001", "EGN00002"})
 
 # 기존 PopularCreditCardService 의 목 스펙 (순서 = 랭킹).
 _POPULAR_CARD_TITLES: list[str] = [
@@ -95,13 +96,19 @@ def _load_rows() -> list[_Row]:
 
 
 def _sort_rows(rows: list[_Row], qee: str | None) -> None:
-    """기존 CreditCardDataRepository._sort_in_place 와 동일한 안정 정렬."""
+    """기존 CreditCardDataRepository._sort_in_place 와 동일한 안정 정렬.
+
+    ``CardSortOrder.api_code`` 가 보내는 ``low_rate``/``high_rate`` 도 함께 처리한다.
+    """
     normalized = (qee or "").strip().lower()
-    annual_fee_first = normalized in {"fee", "annualfee", "annual_fee", "afe", "연회비순"}
-    if annual_fee_first:
+    if normalized in {"fee", "annualfee", "annual_fee", "afe", "연회비순", "low_rate"}:
         rows.sort(key=lambda row: row.title)
         rows.sort(key=lambda row: row.page_id, reverse=True)
         rows.sort(key=lambda row: row.annual_fee)
+    elif normalized == "high_rate":
+        rows.sort(key=lambda row: row.title)
+        rows.sort(key=lambda row: row.page_id, reverse=True)
+        rows.sort(key=lambda row: row.annual_fee, reverse=True)
     else:  # date / score / 출시일순 / 미지정
         rows.sort(key=lambda row: row.title)
         rows.sort(key=lambda row: row.annual_fee)
@@ -119,7 +126,7 @@ class MockBackend:
         data: Any | None = None,
         include_sensitive: bool = False,
     ) -> dict[str, Any]:
-        if itf_id != "EGN00001":
+        if itf_id not in _SUPPORTED_ITF_IDS:
             return {"GRID1": [], "TO_CT": 0}
 
         query: dict[str, Any] = dict(data or {})
@@ -175,9 +182,12 @@ class MockBackend:
         fee_min = _as_int(query.get("AFE_MIN_VL"))
         fee_max = query.get("AFE_MAX_VL")
         fee_max = _as_int(fee_max) if fee_max is not None else 5_000_000
-        card_type = (
-            _CHECK_CARD_TYPE if industry is Industry.YOUTH else _CREDIT_CARD_TYPE
-        )
+        if query.get("CRD_TP") is not None:
+            card_type = _as_int(query["CRD_TP"]) or _CREDIT_CARD_TYPE
+        else:
+            card_type = (
+                _CHECK_CARD_TYPE if industry is Industry.YOUTH else _CREDIT_CARD_TYPE
+            )
         code = str(industry.code)
 
         matched = [
