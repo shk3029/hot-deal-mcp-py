@@ -14,7 +14,7 @@ from pydantic import Field
 from domain.financial_knowledge import FinancialKnowledgeCategory
 from kakao.finance_tips import financial_knowledge_list
 from schemas.finance_tips_schemas import ContentItem
-from tools.common import json_widget, log_tool_request
+from tools.common import json_widget, log_tool_request, source_logger
 from tools.finance_tips.constants import CATEGORY_MAP
 
 logger = logging.getLogger(__name__)
@@ -59,6 +59,7 @@ def register_finance_tips_tools(mcp: Any) -> None:
         ] = None,
     ) -> str:
         log_tool_request(_TOOL_NAME, {"category": category})
+        source_logger.info("tool=%s source=static status=local", _TOOL_NAME)
         try:
             parsed = FinancialKnowledgeCategory.from_string(category)
             items = [

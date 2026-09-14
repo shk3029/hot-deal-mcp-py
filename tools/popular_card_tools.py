@@ -13,7 +13,7 @@ from mcp.types import ToolAnnotations
 
 from kakao.popular_card import popular_credit_card_list
 from mci.card_client import create_card_client
-from tools.common import card_detail_from_mci, json_widget, log_tool_request
+from tools.common import call_card_interface, source_logger, card_detail_from_mci, json_widget, log_tool_request
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ def register_popular_card_tools(mcp: Any) -> None:
     def get_popular_credit_cards() -> str:
         log_tool_request(_TOOL_NAME, {})
         try:
-            result = client.call_with_itf_id(
+            result = call_card_interface(client, tool_name=_TOOL_NAME, itf_id=
                 "EGN00002",
                 data={
                     "SIZ": 5,

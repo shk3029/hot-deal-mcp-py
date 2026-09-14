@@ -12,10 +12,9 @@ from typing import Annotated, Any
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from domain.credit_card_name import CREDIT_CARD_NAMES, parameter_description
 from kakao.card_search import card_name_clarification, credit_card_detail
 from mci.card_client import create_card_client
-from tools.common import card_detail_from_mci, json_widget, log_tool_request
+from tools.common import call_card_interface, source_logger, card_detail_from_mci, json_widget, log_tool_request
 
 
 
@@ -26,7 +25,8 @@ _ERROR_MESSAGE = "### 카드 정보를 불러오지 못했습니다.\n\n잠시 �
 _DESCRIPTION = (
     "Retrieves details for a specific Shinhan Card(신한카드) product. Use when the user "
     "asks about the benefits, annual fee, eligibility, or other details of a named card. "
-    "Resolve the user's wording to one supported cardName value before calling."
+    "Pass the user-provided product name, preserving symbols such as +. "
+    "Never replace a Plus product with a check card or a different product."
 )
 _TOOL_NAME = "getCreditCardDetail"
 
@@ -51,14 +51,13 @@ def register_card_search_tools(mcp: Any) -> None:
         cardName: Annotated[
             str,
             Field(
-                description=parameter_description(),
-                json_schema_extra={"enum": CREDIT_CARD_NAMES},
+                description="조회할 카드명. + 등 상품명 기호를 그대로 보존하고 다른 상품명으로 대체하지 마세요.",
             ),
         ],
     ) -> str:
         log_tool_request(_TOOL_NAME, {"cardName": cardName})
         try:
-            result = client.call_with_itf_id(
+            result = call_card_interface(client, tool_name=_TOOL_NAME, itf_id=
                 "EGN00002",
                 data={
                     "MSG": cardName,
@@ -82,25 +81,17 @@ def register_card_search_tools(mcp: Any) -> None:
                 [repr(card.CRD_PD_NM) for card in cards]  # repr()로 공백/특수문자 노출
             )
             
-            valid_cards = [
-                card for card in cards
-                if card.CRD_PD_NM.strip() in CREDIT_CARD_NAMES
-            ]   
-            
-            # 2. 필터링 결과 확인d
-            logger.info(
-                "필터링 결과 - valid=%s / total=%d",
-                [card.CRD_PD_NM.strip() for card in valid_cards],
-                len(cards),
-            )
-
-            if not valid_cards:
-                logger.info("지원하지 않는 카드 상품명 - MCI 응답 카드명=%s 이 CREDIT_CARD_NAMES에 없음",
-                    [card.CRD_PD_NM for card in cards],
-                )
+            # 상품 기호는 보존하고 공백/대소문자 차이만 허용한다.
+            normalize_name = lambda name: "".join(name.split()).casefold().replace("＋", "+")
+            exact_cards = [card for card in cards
+                           if normalize_name(card.CRD_PD_NM) == normalize_name(cardName)]
+            if len(exact_cards) == 1:
+                selected = exact_cards[0]
+            elif len(cards) == 1 and result.get("TO_CT") == 1:
+                selected = cards[0]
+            else:
                 return json_widget(card_name_clarification(), tool_name=_TOOL_NAME)
-
-            return json_widget(credit_card_detail(valid_cards[0]), tool_name=_TOOL_NAME)
+            return json_widget(credit_card_detail(selected), tool_name=_TOOL_NAME)
 
         except Exception as exception:
             logger.exception("MCP 툴 처리 실패 - tool=getCreditCardDetail")

@@ -46,7 +46,51 @@ def create_card_client() -> CardClient:
 
         )
     logger.info("Card data source selected: %s", source)
-    return client
+    # 미설정이면 기존 클라이언트를 그대로 반환한다.
+    search_source = os.getenv("CARD_SEARCH_DATA_SOURCE", "").strip().lower()
+    if not search_source or search_source == source:
+        return client
+    if search_source not in {"mock", "mci", "es"}:
+        raise RuntimeError("CARD_SEARCH_DATA_SOURCE는 mock, mci, es여야 합니다")
+    logger.info("Card name search data source selected: %s", search_source)
+    return _SearchRoutingClient(client, search_source)
+
+
+class _SearchRoutingClient:
+    """MSG가 있는 EGN00002만 별도 소스로 라우팅한다.
+
+    CARD_DATA_SOURCE=mock CARD_SEARCH_DATA_SOURCE=es: 카드명 검색만 ES.
+    설정 변경 후 서버 재시작이 필요하며, ES 오류를 목업으로 숨기지 않는다.
+    """
+
+    def __init__(self, default: CardClient, search_source: str) -> None:
+        self._default = default
+        self._search_source = search_source
+
+    def data_source_for(self, itf_id: str, data: dict[str, Any]) -> str:
+        if itf_id == "EGN00002" and str(data.get("MSG") or "").strip():
+            return self._search_source
+        return "mock" if type(self._default).__name__ == "MockMciClient" else "mci"
+
+    def call_with_itf_id(
+        self, itf_id: str, *, data: dict[str, Any], include_sensitive: bool = False,
+    ) -> dict[str, Any]:
+        client = self._default
+        if itf_id == "EGN00002" and str(data.get("MSG") or "").strip():
+            # 검색 요청에서만 생성하여 다른 툴은 ES 설정/연결에 의존하지 않는다.
+            if self._search_source == "es":
+                from mci.es_card_client import EsCardClient
+                client = EsCardClient()
+            elif self._search_source == "mock":
+                from mci.mock_client import MockMciClient
+                client = MockMciClient()
+            else:
+                from mci.mci_client import MciClient
+                client = MciClient()
+        return client.call_with_itf_id(
+            itf_id, data=data, include_sensitive=include_sensitive,
+        )
+
 
 class MockCardClient:
 

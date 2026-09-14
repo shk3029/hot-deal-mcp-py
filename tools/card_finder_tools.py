@@ -20,7 +20,7 @@ from domain.card_sort_order import CardSortOrder
 from kakao.card_finder import credit_card_guide_list, industry_selector
 from mci.card_client import create_card_client
 from schemas.card_finder_tools_schemas import CardDetail
-from tools.common import card_detail_from_mci, json_widget, log_tool_request
+from tools.common import call_card_interface, source_logger, card_detail_from_mci, json_widget, log_tool_request
 from domain.industry import Industry  
 
 
@@ -139,10 +139,12 @@ def _recommend(
 ) -> dict[str, Any]:
     print(f"[DEBUG] annual_fee1: {annual_fee}")
     if industry_code is None:
+        source_logger.info("tool=%s source=none status=selector", _TOOL_NAME)
         return industry_selector()
     try:
         industry = Industry.from_code(industry_code)
     except ValueError:
+        source_logger.info("tool=%s source=none status=selector", _TOOL_NAME)
         return industry_selector()
     try:
         print(f"[DEBUG] annual_fee2: {annual_fee}")
@@ -159,7 +161,7 @@ def _recommend(
         else _CREDIT_CARD_TYPE
     )
     type_name = "체크카드" if resolved_type == _CHECK_CARD_TYPE else "신용카드"
-    result = client.call_with_itf_id(
+    result = call_card_interface(client, tool_name=_TOOL_NAME, itf_id=
         "EGN00002",
         data={
             "CRD_BNF": str(industry.code),

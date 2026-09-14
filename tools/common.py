@@ -68,3 +68,29 @@ def card_detail_from_mci(item: dict[str, Any]) -> CardDetail:
         CRD_PD_BNF_DL2=text_value("CRD_PD_BNF_DL2"),
         CRD_PD_BNF_DL3=text_value("CRD_PD_BNF_DL3"),
     )
+
+
+# Uvicorn의 기본 설정은 앱 INFO 로그를 출력하지 않으므로 전용 콘솔 로그를 둔다.
+source_logger = logging.getLogger("mcp.tool.data_source")
+if not source_logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+    source_logger.addHandler(handler)
+source_logger.setLevel(logging.INFO)
+source_logger.propagate = False
+
+
+def call_card_interface(client: Any, itf_id: str, *, tool_name: str,
+                        data: dict[str, Any], include_sensitive: bool = False) -> dict[str, Any]:
+    resolver = getattr(client, "data_source_for", None)
+    source = resolver(itf_id, data) if resolver else {
+        "MockMciClient": "mock", "MockCardClient": "mock",
+        "EsCardClient": "es", "MciClient": "mci",
+    }.get(type(client).__name__, type(client).__name__)
+    try:
+        result = client.call_with_itf_id(itf_id, data=data, include_sensitive=include_sensitive)
+    except Exception:
+        source_logger.info("tool=%s source=%s interface=%s status=error", tool_name, source, itf_id)
+        raise
+    source_logger.info("tool=%s source=%s interface=%s status=success", tool_name, source, itf_id)
+    return result
