@@ -17,7 +17,7 @@ from fastmcp.tools import Tool
 from tools import register_tools
 
 mcp = FastMCP(
-    name="shinhan-credit-card-guide",
+    name="shinhan-card-mcp",
     instructions="신한카드 상품 추천과 카드 상세 정보를 카카오툴즈 위젯 형식으로 제공합니다.",
     version="0.0.1",
 )
