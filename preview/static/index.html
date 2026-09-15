@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shinhan Card Widget Preview</title>
+    <link rel="stylesheet" href="/styles.css?v=4" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand-mark" aria-hidden="true">S</div>
+      <div>
+        <strong>Shinhan Card Widget Preview</strong>
+        <span>ChatKit-compatible local renderer</span>
+      </div>
+      <div class="header-actions">
+        <span id="source-badge" class="source-badge">확인 중</span>
+        <button id="reset-button" class="toolbar-button" type="button">새 대화</button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="chat-panel" aria-label="위젯 미리보기">
+        <div id="thread" class="thread"></div>
+        <div class="composer">
+          <span class="composer-plus">+</span>
+          <span class="composer-placeholder">버튼을 눌러 후속 Tool 호출을 확인하세요</span>
+          <button id="initial-call-button" class="send-button" type="button" title="카드 추천 Tool 호출">↑</button>
+        </div>
+      </section>
+
+      <aside class="control-panel">
+        <section class="tool-runner" aria-labelledby="tool-runner-title">
+          <div class="control-heading">
+            <div>
+              <span class="eyebrow">MCP TOOL TESTER</span>
+              <h1 id="tool-runner-title">툴 직접 호출</h1>
+            </div>
+            <div class="section-actions">
+              <button id="call-tool-button" class="primary-button" type="button">호출</button>
+              <button
+                class="collapse-button"
+                type="button"
+                data-toggle-section="tool-runner-body"
+                aria-expanded="true"
+              >접기</button>
+            </div>
+          </div>
+          <div id="tool-runner-body" class="collapsible-body">
+            <p class="help">
+              카카오의 발화 분석 영역 대신 툴과 입력값을 직접 선택해 호출합니다.
+            </p>
+            <label class="field-label" for="tool-select">Tool</label>
+            <select id="tool-select" class="form-control"></select>
+            <p id="tool-description" class="tool-description"></p>
+            <div id="tool-fields" class="tool-fields"></div>
+          </div>
+        </section>
+
+        <div class="panel-divider"></div>
+
+        <section class="json-runner">
+        <div class="control-heading">
+          <div>
+            <span class="eyebrow">DEVELOPER</span>
+            <h1>Tool 응답 JSON</h1>
+          </div>
+          <div class="section-actions">
+            <button id="render-button" class="primary-button" type="button">즉시 반영</button>
+            <button
+              class="collapse-button"
+              type="button"
+              data-toggle-section="json-editor-body"
+              aria-expanded="false"
+            >펼치기</button>
+          </div>
+        </div>
+        <div id="json-editor-body" class="collapsible-body" hidden>
+        <p class="help">
+          직접 반환한 <code>{"widget": ..., "copy_text": ...}</code>,
+          JSON 문자열 또는 JSON-RPC 응답을 붙여넣을 수 있습니다. 입력 내용은
+          자동으로 실시간 반영됩니다.
+        </p>
+        <textarea id="json-input" spellcheck="false" aria-label="Tool 응답 JSON"></textarea>
+        <div id="error" class="error" hidden></div>
+        <details class="copy-panel">
+          <summary>공유용 copy_text 확인</summary>
+          <pre id="copy-text"></pre>
+        </details>
+        <div class="reference-note">
+          <strong>반영한 프리뷰 기준</strong>
+          <span>Card 440px · radius 20px · padding 16px</span>
+          <span>Button 36px · pill · Row gap 16px</span>
+          <span>Image 112×72px · object-fit contain</span>
+        </div>
+        </div>
+        </section>
+      </aside>
+    </main>
+
+    <script src="/app.js?v=4" defer></script>
+  </body>
+</html>
