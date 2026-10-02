@@ -4,6 +4,7 @@ import logging
 import os
 import sys
 from types import SimpleNamespace
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
@@ -136,6 +137,30 @@ def test_empty_card_result_shows_guidance_and_more_cards_button():
     assert more_cards_button["onClickAction"]["payload"]["target"]["url"]
     assert message in payload["copy_text"]
     assert "[더 많은 카드 보기]" in payload["copy_text"]
+
+
+def test_card_navigation_urls_include_kakao_referrer():
+    detail = call("getCreditCardDetail", "신한카드 Mr.Life")
+    popular = call("getPopularCreditCards")
+    recommendation = call(
+        "getCreditCardRecommendationsWithSelector",
+        5,
+        "제한없음",
+        1,
+        "출시일순",
+    )
+
+    buttons = [
+        (detail, detail["widget"]["children"][-1]),
+        (popular, popular["widget"]["children"][3]),
+        (recommendation, recommendation["widget"]["children"][1]),
+    ]
+    for payload, button in buttons:
+        target = button["onClickAction"]["payload"]["target"]
+        url = target["url"]
+        assert parse_qs(urlsplit(url).query)["param"] == ["fr_kkt"]
+        assert target["pcUrl"] == url
+        assert url in payload["copy_text"]
 
 
 def test_popular_card_rows_open_the_same_card_detail_prompt_as_search_results():

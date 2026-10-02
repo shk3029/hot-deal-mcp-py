@@ -10,6 +10,7 @@ from __future__ import annotations
 from kakao.common import (
     Widget,
     WidgetResponse,
+    add_card_referrer,
     absolute_url,
     format_won,
     open_url_action,
@@ -26,6 +27,7 @@ def card_name_clarification() -> WidgetResponse:
 
 def credit_card_detail(card: CardDetail) -> WidgetResponse:
     benefits = _benefits(card)
+    detail_page_url = add_card_referrer(absolute_url(card.CRD_PD_URL))
 
     children: list[Widget] = [
         _card_detail_header(card),
@@ -33,7 +35,7 @@ def credit_card_detail(card: CardDetail) -> WidgetResponse:
         {"type": "Text", "value": "주요 혜택", "weight": "semibold"},
     ]
     children.extend(_card_benefit_row(benefit) for benefit in benefits)
-    children.append(_detail_page_button(absolute_url(card.CRD_PD_URL)))
+    children.append(_detail_page_button(detail_page_url))
 
     widget = {"type": "Card", "children": children}
 
@@ -46,7 +48,7 @@ def credit_card_detail(card: CardDetail) -> WidgetResponse:
     for benefit in benefits:
         lines.append(f"- {benefit}")
     copy_text = "\n".join(lines) + "\n"
-    copy_text += f"\n[자세히 보기]({absolute_url(card.CRD_PD_URL)})"
+    copy_text += f"\n[자세히 보기]({detail_page_url})"
     return response(widget, copy_text)
 
 

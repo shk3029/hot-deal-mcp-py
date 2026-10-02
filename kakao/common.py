@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import urlencode, urlsplit, urlunsplit
 
 Widget = dict[str, Any]
 WidgetResponse = dict[str, Any]
@@ -16,10 +17,12 @@ SELECTOR_BUTTONS_PER_ROW = 4
 # 인기 카드 TOP10 차트 (인기카드 위젯의 "차트 보러가기" 버튼)
 CARD_RANKING_URL = (
     "https://www.shinhancard.com/pconts/html/landing/2013846_2424.html?Tab=tab2"
+    "&param=fr_kkt"
 )
 # 카드 검색 화면 (카드 추천 위젯의 "더 많은 카드 보기" 버튼)
 CARD_SEARCH_URL = (
     "https://www.shinhancard.com/mob/MOBFM039N/MOBFM039C01.shc?crustMenuId=ms467"
+    "&param=fr_kkt"
 )
 
 _CARD_HOST = "https://www.shinhancard.com"
@@ -38,6 +41,14 @@ def absolute_url(path: str, *, image: bool = False) -> str:
         return path
     host = _IMAGE_HOST if image else _CARD_HOST
     return host + (path if path.startswith("/") else f"/{path}")
+
+
+def add_card_referrer(url: str) -> str:
+    """카드 랜딩 URL에 카카오톡 유입 식별자를 추가한다."""
+    parts = urlsplit(url)
+    referrer = urlencode({"param": "fr_kkt"})
+    query = f"{parts.query}&{referrer}" if parts.query else referrer
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, query, parts.fragment))
 
 
 def format_won(amount: int) -> str:
