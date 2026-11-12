@@ -10,12 +10,14 @@ from tools.card_finder_tools import register_card_finder_tools
 from tools.card_search_tools import register_card_search_tools
 from tools.finance_tips_tools import register_finance_tips_tools
 from tools.popular_card_tools import register_popular_card_tools
+from tools.event_tools import register_event_tools
 
 REGISTER_TOOLS = [
     register_card_finder_tools,
     register_card_search_tools,
     register_popular_card_tools,
     register_finance_tips_tools,
+    register_event_tools,
 ]
 
 

@@ -62,6 +62,8 @@ const FIELD_LABELS = {
   cardType: "카드 종류",
   sort: "정렬",
   cardName: "카드명",
+  brand: "브랜드",
+  event_type: "이벤트 분류",
   category: "카테고리",
 };
 
@@ -95,6 +97,12 @@ function createField(toolName, name, property, required) {
   let control;
   if (Array.isArray(options)) {
     control = document.createElement("select");
+    if (toolName === "getBrandEvents" && !required) {
+      const emptyOption = document.createElement("option");
+      emptyOption.value = "";
+      emptyOption.textContent = "미지정 · 전체";
+      control.append(emptyOption);
+    }
     options.map(optionPair).forEach(([value, text]) => {
       const option = document.createElement("option");
       option.value = value;
@@ -254,7 +262,11 @@ function renderWidget(spec) {
         node.setAttribute("aria-label", spec.label || "카드 상세 보기");
         node.append(el("span", "chevron"));
       }
-      node.addEventListener("click", () => handleAction(spec.onClickAction));
+      node.addEventListener("click", (event) => {
+        // 클릭 가능한 ListViewItem 안의 버튼이 행 액션까지 중복 실행하지 않도록 한다.
+        event.stopPropagation();
+        handleAction(spec.onClickAction);
+      });
       break;
     case "Divider":
       node = el("div", "w-divider");

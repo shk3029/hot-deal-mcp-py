@@ -27,6 +27,7 @@ EXPECTED_NAMES = {
     "getCreditCardDetail",
     "getPopularCreditCards",
     "getFinancialLifeKnowledgeArticles",
+    "getBrandEvents",
 }
 
 
