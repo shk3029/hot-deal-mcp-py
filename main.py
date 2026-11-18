@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+import logging
 import uvicorn
 import os
 
-from api.app import create_app
+# uvicorn main:app 으로 띄울 때도 툴 요청 감사 로그(mcp.tool.audit, INFO)가 터미널에 나오도록 한다.
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+)
+
+from api.app import create_app  # noqa: E402
 from setup_otel import setup_otel
 
 # from core.environment import get_env

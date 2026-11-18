@@ -126,6 +126,9 @@ class MockBackend:
         data: Any | None = None,
         include_sensitive: bool = False,
     ) -> dict[str, Any]:
+        if itf_id == "EGN00003":
+            from mci.event_mock import search_events
+            return search_events(dict(data or {}))
         if itf_id not in _SUPPORTED_ITF_IDS:
             return {"GRID1": [], "TO_CT": 0}
 

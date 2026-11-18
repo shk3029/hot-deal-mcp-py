@@ -1,9 +1,37 @@
-"""기획 검증용 이벤트 목업. 실제 API 규격이나 실제 행사 데이터가 아니다."""
+"""EGN00003 [Kakao] 이벤트 검색데이터 요청·응답 변환.
+
+요청: CHL=sol-hpg, CAG=event, QEE=now_event 고정. brand 는 MSG(키워드 검색),
+event_type 은 CAG_CD(홈페이지 분류 숫자코드)로 보낸다.
+응답: GRID1 각 행을 ``Event`` 로 바꾸고, 시작일~종료일에 오늘이 포함된 것만 남긴다.
+"""
 from __future__ import annotations
-import os
-from datetime import date, datetime, timedelta
+
+import logging
+from datetime import date, datetime
+from typing import Any
 from zoneinfo import ZoneInfo
+
 from pydantic import BaseModel, ConfigDict
+
+logger = logging.getLogger(__name__)
+
+EVENT_ITF_ID = "EGN00003"
+_CHANNEL = "sol-hpg"
+_CATEGORY = "event"
+_SORT = "now_event"
+
+# GRID1 응답 필드. I/F 정의서 화면에서 영문명 뒤쪽이 잘려 보여 접두어로 찾는다.
+# 전체 영문명이 확정되면 FIELD_PREFIXES 값을 전체 이름으로 바꾸면 된다(접두어 = 전체명도 동작).
+FIELD_PREFIXES = {
+    "id": "MOB_WB_EVT_R",            # 모바일웹이벤트접수번호
+    "thumbnail_url": "HPG_EVT_CTG_I",  # 홈페이지이벤트목록이미지
+    "detail_url": "HPG_EVT_DL_PG",     # 홈페이지이벤트상세페이지
+    "description": "MOB_WB_EVT_T",     # 모바일웹이벤트내용
+    "category": "MOB_WB_BNF_C",        # 모바일웹혜택카테고리
+    "title": "MOB_WB_EVT_N",           # 모바일웹이벤트명
+    "start_date": "MOB_WB_EVT_S",      # 모바일웹이벤트시작일
+    "end_date": "MOB_WB_EVT_E",        # 모바일웹이벤트종료일
+}
 
 
 def today_kst() -> date:
@@ -13,46 +41,56 @@ def today_kst() -> date:
 class Event(BaseModel):
     model_config = ConfigDict(frozen=True)
     id: str
-    brand: str
-    event_type: str
     title: str
     description: str
-    published_date: date
+    category: str
     start_date: date
     end_date: date
-    # 실제 연동 시 이벤트 썸네일 URL. 없으면 위젯이 프리뷰 목업 썸네일을 사용한다.
-    thumbnail_url: str | None = None
+    thumbnail_url: str
+    detail_url: str
 
 
-class MockEventClient:
-    def list_events(self) -> list[Event]:
-        today = today_kst()
-        # 홈페이지 운영 분류를 추측하지 않고 기획 예시를 명시적으로 매핑한다.
-        specs = [("sol-link", "SOL LINK 체크카드", "쇼핑문화"),
-                 ("starbucks-shopping", "스타벅스", "쇼핑문화"),
-                 ("starbucks-payment", "스타벅스", "카드결제")]
-        specs += [(f"super-sol-{i}", "슈퍼SOL", "카드결제") for i in range(6)]
-        specs += [(f"travel-{i}", b, "여행숙박") for i, b in enumerate(
-            ["아고다", "트립닷컴", "시그니엘", "하얏트", "제주", "JCB"])]
-        specs += [("discover", "디스커버", "앱테크"), ("school", "교원", "청소년")]
-        # 목록 텍스트1(요약)로 쓰이는 분류별 가상 문구. 실제 혜택 조건이 아니다.
-        summaries = {"쇼핑문화": "결제 시 최대 10% 캐시백 (목업)",
-                     "카드결제": "이벤트 기간 결제 시 포인트 적립 (목업)",
-                     "여행숙박": "예약 시 최대 15% 할인 (목업)",
-                     "앱테크": "앱 참여하고 포인트 받기 (목업)",
-                     "청소년": "자동납부 등록 시 혜택 제공 (목업)"}
-        events = []
-        for index, (key, brand, category) in enumerate(specs):
-            events.append(Event(id=key, brand=brand, event_type=category,
-                title=f"[목업] {brand} {category} 이벤트 {index + 1}",
-                description=f"{brand} {summaries[category]}",
-                published_date=today-timedelta(days=index),
-                start_date=today-timedelta(days=30), end_date=today+timedelta(days=7)))
-        return events
+def event_request(*, keyword: str = "", category_code: int | None = None) -> dict[str, str]:
+    return {
+        "CHL": _CHANNEL,
+        "CAG": _CATEGORY,
+        "MSG": keyword,
+        "CAG_CD": "" if category_code is None else str(category_code),
+        "QEE": _SORT,
+    }
 
 
-def create_event_client() -> MockEventClient:
-    source = os.getenv("EVENT_DATA_SOURCE", "unconfigured").strip().lower()
-    if source == "mock":
-        return MockEventClient()
-    raise RuntimeError("이벤트 API 미연동: 로컬 검증은 EVENT_DATA_SOURCE=mock을 지정하세요.")
+def _field(row: dict[str, Any], prefix: str) -> str:
+    value = row.get(prefix)
+    if value is None:
+        value = next((v for k, v in row.items() if k.startswith(prefix)), None)
+    return "" if value is None else str(value).strip()
+
+
+def _yyyymmdd(value: str) -> date | None:
+    digits = value.replace("-", "").replace(".", "")
+    if len(digits) != 8 or not digits.isdigit():
+        return None
+    try:
+        return datetime.strptime(digits, "%Y%m%d").date()
+    except ValueError:
+        return None
+
+
+def parse_events(result: Any, *, today: date) -> list[Event]:
+    """GRID1 을 MCI 순서(now_event) 그대로 변환하고 진행 기간 밖이거나 날짜가 깨진 행은 뺀다."""
+    if not isinstance(result, dict) or not isinstance(result.get("GRID1", []), list):
+        raise TypeError("MCI 이벤트 응답 형식이 올바르지 않습니다.")
+    events: list[Event] = []
+    for row in result.get("GRID1", []):
+        if not isinstance(row, dict):
+            continue
+        values = {name: _field(row, prefix) for name, prefix in FIELD_PREFIXES.items()}
+        start, end = _yyyymmdd(values["start_date"]), _yyyymmdd(values["end_date"])
+        if start is None or end is None or not values["title"]:
+            logger.warning("이벤트 행 제외(필수값/날짜 오류) - id=%s", values["id"])
+            continue
+        if not start <= today <= end:
+            continue
+        events.append(Event(**{**values, "start_date": start, "end_date": end}))
+    return events

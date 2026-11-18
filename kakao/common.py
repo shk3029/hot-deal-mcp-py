@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 from typing import Any
-from urllib.parse import urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 Widget = dict[str, Any]
 WidgetResponse = dict[str, Any]
@@ -46,6 +46,8 @@ def absolute_url(path: str, *, image: bool = False) -> str:
 def add_card_referrer(url: str) -> str:
     """카드 랜딩 URL에 카카오톡 유입 식별자를 추가한다."""
     parts = urlsplit(url)
+    if not url or ("param", "fr_kkt") in parse_qsl(parts.query):
+        return url
     referrer = urlencode({"param": "fr_kkt"})
     query = f"{parts.query}&{referrer}" if parts.query else referrer
     return urlunsplit((parts.scheme, parts.netloc, parts.path, query, parts.fragment))

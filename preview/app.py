@@ -15,6 +15,11 @@ os.environ.setdefault("CARD_DATA_SOURCE", "mock")
 
 from server import mcp  # noqa: E402  (환경변수 설정 후 Tool을 등록해야 한다.)
 
+if os.getenv("CARD_DATA_SOURCE") == "mock":
+    # 목업 이벤트의 "더 많은 이벤트 보기"를 로컬 랜딩으로 연결한다.
+    from mci.event_mock import mock_events_url  # noqa: E402
+    os.environ.setdefault("EVENT_LIST_URL", mock_events_url())
+
 
 ROOT = Path(__file__).resolve().parent
 
@@ -45,16 +50,15 @@ def mock_event_thumbnail(event_id: str):
 @app.get("/mock-events")
 @app.get("/mock-events/{event_id}")
 def mock_event_landing(event_id: str | None = None):
+    """EGN00003 목업 행의 상세/전체 링크가 가리키는 로컬 랜딩."""
     from html import escape
     from fastapi.responses import HTMLResponse
-    from mci.event_client import create_event_client, today_kst
-    from kakao.events import mock_events_url
+    from mci.event_client import parse_events, today_kst
+    from mci.event_mock import mock_event_rows, mock_events_url
 
-    if os.getenv("EVENT_DATA_SOURCE") != "mock":
-        raise HTTPException(status_code=503, detail="이벤트 목업 모드가 아닙니다.")
-    today = today_kst()
-    events = sorted([e for e in create_event_client().list_events()
-        if e.start_date <= today <= e.end_date], key=lambda e: (e.published_date, e.id), reverse=True)
+    if os.getenv("CARD_DATA_SOURCE", "mock") != "mock":
+        raise HTTPException(status_code=503, detail="목업 모드가 아닙니다.")
+    events = parse_events({"GRID1": mock_event_rows()}, today=today_kst())
     if event_id is not None:
         events = [e for e in events if e.id == event_id]
         if not events:
@@ -65,11 +69,10 @@ def mock_event_landing(event_id: str | None = None):
         "<h1>이벤트 목업 미리보기</h1><p>가상 데이터입니다. 실제 혜택·응모·개인별 참여 자격을 제공하지 않습니다.</p>"]
     for e in events:
         parts.append(f"<article><h2>{escape(e.title)}</h2><p>{escape(e.description)}</p>"
-            f"<p>{escape(e.event_type)} · {e.start_date} ~ {e.end_date}</p>"
+            f"<p>{escape(e.category)} · {e.start_date} ~ {e.end_date}</p>"
             f'<a href="{escape(mock_events_url(e.id), quote=True)}">자세히 보기 (목업)</a></article>')
     parts.append(f'<p><a href="{escape(mock_events_url(), quote=True)}">전체 목업 이벤트</a></p></main></body></html>')
     return HTMLResponse("".join(parts))
-
 
 
 @app.get("/api/health")
